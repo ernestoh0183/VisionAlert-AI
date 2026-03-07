@@ -413,7 +413,7 @@ button {
     }
     
     .view-section {
-        padding-top: 180px; /* Increased padding for stacked header */
+        padding-top: 260px; /* Increased padding for stacked header */
     }
 
     /* Fixed camera scaling */
