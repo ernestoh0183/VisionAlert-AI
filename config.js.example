@@ -1,0 +1,10 @@
+// [EN] VisionAlert AI - Secure Configuration Template
+// [ES] VisionAlert AI - Plantilla de Configuración Segura
+
+// [EN] Copy this file to 'config.js' and add your Supabase credentials.
+// [ES] Copia este archivo a 'config.js' y agrega tus credenciales de Supabase.
+
+export const SUPABASE_CONFIG = {
+    URL: 'YOUR_SUPABASE_URL_HERE',
+    KEY: 'YOUR_SUPABASE_ANON_KEY_HERE'
+};

@@ -1,0 +1,428 @@
+:root {
+    --bg-color: #0a0a0a;
+    --text-color: #ffffff;
+    --accent-color: #00e5ff;
+    --primary-color: #2979ff;
+    --success-color: #00e676;
+    --danger-color: #ff1744;
+    --mouse-x: 50%;
+    --mouse-y: 50%;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+}
+
+body {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    min-height: 100vh;
+    overflow-x: hidden;
+}
+
+/* [EN] Glassmorphism Classes / [ES] Clases de Efecto Vidrio (Glassmorphism) */
+.glass-panel, .glass-card {
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+}
+
+.glass-card {
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+/* [EN] Interactive Glow Background / [ES] Fondo con Brillo Interactivo */
+#glow-pointer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    pointer-events: none;
+    z-index: -1;
+    background: radial-gradient(circle at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(0, 229, 255, 0.08), transparent 40%);
+}
+
+/* [EN] Layout Utilities / [ES] Utilidades de Diseño */
+.hidden {
+    display: none !important;
+}
+
+.view-section {
+    padding: 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding-top: 100px; /* Space for fixed header */
+    animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* [EN] Header & Navigation / [ES] Encabezado y Navegación */
+header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 20px;
+    z-index: 100;
+    border-radius: 0 0 12px 12px;
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+}
+
+header h1 {
+    font-size: 1.5rem;
+    color: var(--accent-color);
+    text-shadow: 0 0 10px rgba(0, 229, 255, 0.3);
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+#system-clock {
+    display: flex;
+    align-items: center;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--accent-color);
+    letter-spacing: 2px;
+    text-shadow: 0 0 10px rgba(0, 229, 255, 0.4), 0 0 20px rgba(0, 229, 255, 0.2);
+    background: rgba(0, 0, 0, 0.3);
+    padding: 5px 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(0, 229, 255, 0.1);
+}
+
+#system-clock span {
+    display: inline-block;
+    min-width: 32px;
+    text-align: center;
+}
+
+#system-clock .colon {
+    animation: blink 1s infinite;
+    min-width: 15px;
+}
+
+@keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}
+
+nav {
+    display: flex;
+    gap: 10px;
+}
+
+/* [EN] Pulse Animation for Status Indicator / [ES] Animación de Pulso para el Indicador de Estado */
+@keyframes svgPulse {
+    0% { filter: drop-shadow(0 0 2px rgba(0,230,118,0.8)); opacity: 1; }
+    50% { filter: drop-shadow(0 0 10px rgba(0,230,118,0.2)); opacity: 0.6; }
+    100% { filter: drop-shadow(0 0 2px rgba(0,230,118,0.8)); opacity: 1; }
+}
+
+circle.pulse-active {
+    animation: svgPulse 2s infinite;
+}
+
+/* [EN] Forms and Buttons Styling / [ES] Estilos de Formularios y Botones */
+input[type="email"],
+input[type="password"],
+input[type="text"],
+select {
+    width: 100%;
+    padding: 12px;
+    margin: 8px 0 16px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: white;
+    border-radius: 6px;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+input:focus, select:focus {
+    border-color: var(--accent-color);
+}
+
+.checkbox-label {
+    display: block;
+    margin-bottom: 15px;
+    cursor: pointer;
+}
+
+.checkbox-label input {
+    margin-right: 10px;
+    accent-color: var(--accent-color);
+}
+
+button {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: all 0.2s;
+}
+
+.btn-nav {
+    background: transparent;
+    color: var(--text-color);
+    border: 1px solid transparent;
+}
+
+.btn-nav:hover {
+    border-color: rgba(255,255,255,0.2);
+    background: rgba(255,255,255,0.05);
+}
+
+.btn-primary {
+    background: var(--primary-color);
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #1565c0;
+    box-shadow: 0 0 10px rgba(41, 121, 255, 0.5);
+}
+
+.btn-secondary {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.btn-text {
+    background: transparent;
+    color: var(--text-color);
+    padding: 5px 10px;
+    text-decoration: underline;
+    opacity: 0.8;
+}
+
+.btn-text:hover {
+    opacity: 1;
+    color: var(--accent-color);
+}
+
+.btn-danger {
+    background: var(--danger-color);
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #d50000;
+}
+
+.btn-group {
+    display: flex;
+    gap: 10px;
+}
+
+.error-msg {
+    color: var(--danger-color);
+    margin-top: 10px;
+    font-size: 0.9rem;
+}
+
+.success-msg {
+    color: var(--success-color);
+    margin-top: 10px;
+    font-size: 0.9rem;
+}
+
+/* [EN] Desktop sizing for auth/config boxes / [ES] Tamaño de escritorio para cajas de auth/config */
+.login-box, .config-box {
+    max-width: 500px;
+    margin: 40px auto;
+}
+
+.login-box h2, .config-box h2 {
+    margin-bottom: 20px;
+    font-weight: 500;
+    color: var(--accent-color);
+}
+
+/* [EN] Dashboard Grid & Alert Cards / [ES] Cuadrícula del Dashboard y Tarjetas de Alerta */
+.odometer-panel {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.odometer-card h3 {
+    margin-bottom: 15px;
+    color: var(--accent-color);
+}
+
+.odometer-card p {
+    font-size: 1.1rem;
+    margin-bottom: 10px;
+}
+
+.odometer-card span {
+    font-weight: bold;
+    font-size: 1.3rem;
+    color: var(--text-color);
+}
+
+.cleanup-controls {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.cleanup-controls h3 {
+    margin: 0;
+}
+
+.cleanup-controls select {
+    width: auto;
+    margin: 0;
+}
+
+#alerts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.alert-card {
+    display: flex;
+    flex-direction: column;
+    animation: scaleIn 0.3s ease-out;
+}
+
+@keyframes scaleIn {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+.alert-card h4 {
+    color: var(--danger-color);
+    margin-bottom: 5px;
+}
+
+.alert-card small {
+    color: rgba(255,255,255,0.6);
+    margin-bottom: 10px;
+}
+
+.alert-card img {
+    width: 100%;
+    border-radius: 8px;
+    margin-top: 15px;
+    object-fit: contain;
+    background: rgba(0,0,0,0.5);
+    max-height: 250px;
+}
+
+.fade-out {
+    opacity: 0;
+    transition: opacity 0.5s ease;
+}
+
+/* [EN] Camera and AI Video Overlay / [ES] Interfaz de Cámara y Superposición de Video de IA */
+.camera-container {
+    position: relative;
+    width: 100%;
+    max-width: 1000px;
+    margin: 0 auto;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #000;
+    aspect-ratio: 16/9;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+}
+
+#camera-video, #camera-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+#camera-canvas {
+    z-index: 10;
+    touch-action: none;
+    cursor: crosshair;
+}
+
+.camera-controls {
+    max-width: 1000px;
+    margin: 20px auto;
+    text-align: center;
+    padding: 20px;
+}
+
+#btn-clear-zone {
+    margin: 15px 0;
+}
+
+#ai-status {
+    color: var(--success-color);
+    font-family: monospace;
+    font-size: 1.1rem;
+}
+
+/* [EN] Responsive Design for Mobile / [ES] Diseño Responsivo para Móviles */
+@media (max-width: 768px) {
+    .odometer-panel {
+        grid-template-columns: 1fr;
+    }
+    
+    header {
+        flex-direction: column;
+        gap: 15px;
+        padding-bottom: 20px;
+    }
+
+    .header-right {
+        flex-direction: column;
+        width: 100%;
+        gap: 10px;
+    }
+
+    nav {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    
+    .view-section {
+        padding-top: 180px; /* Increased padding for stacked header */
+    }
+
+    /* Fixed camera scaling */
+    .camera-container {
+        aspect-ratio: auto;
+        min-height: 400px;
+    }
+
+    #system-clock {
+        font-size: 1.5rem;
+    }
+}

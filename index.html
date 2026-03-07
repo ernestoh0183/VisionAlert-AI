@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VisionAlert AI</title>
+    <link rel="manifest" href="./manifest.json">
+    <meta name="theme-color" content="#0a0a0a">
+    <link rel="stylesheet" href="./style.css">
+    <!-- [EN] Supabase SDK (Backend as a Service) / [ES] SDK de Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- [EN] TensorFlow.js & COCO-SSD (AI Models) / [ES] TensorFlow.js y Modelos de IA -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+</head>
+<body>
+    <div id="glow-pointer"></div>
+
+    <header class="glass-panel">
+        <div class="header-left">
+            <h1>VisionAlert AI</h1>
+        </div>
+        <div class="header-right">
+            <div id="system-clock" class="digital-clock">
+                <span id="clock-h">00</span><span class="colon">:</span><span id="clock-m">00</span><span class="colon">:</span><span id="clock-s">00</span>
+            </div>
+            <svg class="status-indicator" width="16" height="16" viewBox="0 0 16 16">
+                <circle cx="8" cy="8" r="6" fill="#00e676" class="pulse-active"></circle>
+            </svg>
+            <nav id="main-nav" class="hidden">
+                <button onclick="app.navigate('dashboard')" class="btn-nav">Dashboard</button>
+                <button onclick="app.navigate('camera')" class="btn-nav">Camera</button>
+                <button onclick="app.navigate('config')" class="btn-nav">Config</button>
+                <button onclick="app.auth.signOut()" class="btn-nav">Logout</button>
+            </nav>
+        </div>
+    </header>
+
+    <!-- [EN] AUTH VIEW / [ES] VISTA DE AUTENTICACIÓN -->
+    <main id="view-auth" class="view-section">
+        <div class="glass-card login-box">
+            <h2>Authentication</h2>
+            <form id="auth-form">
+                <input type="email" id="auth-email" placeholder="Email" required>
+                <input type="password" id="auth-password" placeholder="Password" required>
+                <div class="btn-group">
+                    <button type="submit" id="btn-login" class="btn-primary">Login</button>
+                    <button type="button" id="btn-register" class="btn-secondary">Register</button>
+                </div>
+                <div style="margin-top: 15px; text-align: center;">
+                    <button type="button" id="btn-show-reset" class="btn-text">Forgot Password?</button>
+                </div>
+                <p id="auth-error" class="error-msg"></p>
+                <p id="auth-message" class="success-msg"></p>
+            </form>
+        </div>
+
+        <!-- [EN] Password Reset Box (Hidden by Default) / [ES] Caja de Recuperación de Contraseña (Oculta por defecto) -->
+        <div id="reset-box" class="glass-card login-box hidden">
+            <h2>Reset Password</h2>
+            <form id="reset-form">
+                <input type="email" id="reset-email" placeholder="Enter your email" required>
+                <div class="btn-group">
+                    <button type="submit" id="btn-send-reset" class="btn-primary">Send Reset Link</button>
+                    <button type="button" id="btn-cancel-reset" class="btn-text">Back to Login</button>
+                </div>
+                <p id="reset-error" class="error-msg"></p>
+                <p id="reset-message" class="success-msg"></p>
+            </form>
+        </div>
+    </main>
+
+    <!-- [EN] CONFIG VIEW / [ES] VISTA DE CONFIGURACIÓN -->
+    <main id="view-config" class="view-section hidden">
+        <div class="glass-card config-box">
+            <h2>Configuration</h2>
+            <form id="config-form">
+                <label>Telegram Bot Token:</label>
+                <input type="text" id="telegram-token" placeholder="123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11">
+                
+                <label>Telegram Chat ID:</label>
+                <input type="text" id="telegram-chat-id" placeholder="123456789">
+                
+                <label class="checkbox-label"><input type="checkbox" id="detect-cars" checked> Detect Cars</label>
+                <label class="checkbox-label"><input type="checkbox" id="detect-persons" checked> Detect Persons</label>
+                
+                <button type="submit" class="btn-primary">Save Configuration</button>
+                <p id="config-status"></p>
+            </form>
+        </div>
+    </main>
+
+    <!-- [EN] DASHBOARD VIEW / [ES] VISTA DE PANEL PRINCIPAL -->
+    <main id="view-dashboard" class="view-section hidden">
+        <div class="odometer-panel">
+            <div class="glass-card odometer-card">
+                <h3>Lifetime Stats</h3>
+                <p>Usage: <span id="stat-total-usage">0</span> min</p>
+                <p>Alerts: <span id="stat-total-alerts">0</span></p>
+            </div>
+            <div class="glass-card odometer-card">
+                <h3>Trip Stats</h3>
+                <p>Usage: <span id="stat-trip-usage">0</span> min</p>
+                <p>Alerts: <span id="stat-trip-alerts">0</span></p>
+                <button id="reset-trip" class="btn-secondary">Reset Trip</button>
+            </div>
+        </div>
+
+        <div class="glass-card cleanup-controls">
+            <h3>Cleanup History</h3>
+            <select id="cleanup-timeframe">
+                <option value="1">1 Hour</option>
+                <option value="3">3 Hours</option>
+                <option value="6">6 Hours</option>
+                <option value="12">12 Hours</option>
+                <option value="24">24 Hours</option>
+                <option value="36">36 Hours</option>
+                <option value="168">1 Week</option>
+            </select>
+            <button id="btn-clear-history" class="btn-danger">Clear History</button>
+        </div>
+
+        <div id="alerts-grid">
+            <!-- Dynamic alert cards will go here -->
+        </div>
+    </main>
+
+    <!-- [EN] CAMERA VIEW / [ES] VISTA DE CÁMARA (IA) -->
+    <main id="view-camera" class="view-section hidden">
+        <div class="camera-container">
+            <video id="camera-video" autoplay playsinline muted></video>
+            <canvas id="camera-canvas"></canvas>
+        </div>
+        <div class="camera-controls glass-panel">
+            <p>Draw a rectangle on the video to define the "Zone of Interest"</p>
+            <button id="btn-clear-zone" class="btn-secondary">Clear Zone</button>
+            <p id="ai-status">AI Status: Loading Model...</p>
+        </div>
+    </main>
+
+    <script type="module" src="./app.js"></script>
+</body>
+</html>

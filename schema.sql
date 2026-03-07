@@ -1,0 +1,58 @@
+-- [EN] Create profiles table for user settings and statistics
+-- [ES] Crear tabla de perfiles para configuraciones y estadísticas del usuario
+CREATE TABLE public.profiles (
+  id uuid NOT NULL REFERENCES auth.users ON DELETE CASCADE,
+  telegram_token text,
+  telegram_chat_id text,
+  detect_cars boolean DEFAULT true,
+  detect_persons boolean DEFAULT true,
+  interest_zone jsonb,
+  total_alerts integer DEFAULT 0,
+  trip_alerts integer DEFAULT 0,
+  total_usage_minutes integer DEFAULT 0,
+  trip_usage_minutes integer DEFAULT 0,
+  PRIMARY KEY (id)
+);
+
+-- [EN] Enable Row Level Security (RLS) for profiles to ensure privacy
+-- [ES] Habilitar Seguridad a Nivel de Fila (RLS) para privacidad de perfiles
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own profile" ON public.profiles FOR SELECT USING (auth.uid() = id);
+CREATE POLICY "Users can insert own profile" ON public.profiles FOR INSERT WITH CHECK (auth.uid() = id);
+CREATE POLICY "Users can update own profile" ON public.profiles FOR UPDATE USING (auth.uid() = id);
+CREATE POLICY "Users can delete own profile" ON public.profiles FOR DELETE USING (auth.uid() = id);
+
+-- [EN] Create alerts table to log detected events
+-- [ES] Crear tabla de alertas para registrar eventos detectados
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+CREATE TABLE public.alerts (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  user_id uuid REFERENCES public.profiles(id) ON DELETE CASCADE,
+  created_at timestamptz DEFAULT now(),
+  type text,
+  quantity integer,
+  photo_url text,
+  PRIMARY KEY (id)
+);
+
+-- [EN] Enable RLS for alerts to prevent unauthorized access
+-- [ES] Habilitar RLS para alertas para prevenir acceso no autorizado
+ALTER TABLE public.alerts ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own alerts" ON public.alerts FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert own alerts" ON public.alerts FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update own alerts" ON public.alerts FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete own alerts" ON public.alerts FOR DELETE USING (auth.uid() = user_id);
+
+-- [EN] Setup pg_cron for automatic deletion of alerts older than 7 days
+-- [ES] Configurar pg_cron para la eliminación automática de alertas con más de 7 días
+-- Enable extension if needed / Habilitar extensión si es necesario
+CREATE EXTENSION IF NOT EXISTS "pg_cron";
+
+SELECT cron.schedule(
+  'delete-old-alerts',
+  '0 0 * * *',
+  $$DELETE FROM public.alerts WHERE created_at < NOW() - INTERVAL '7 days';$$
+);

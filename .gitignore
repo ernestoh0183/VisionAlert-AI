@@ -1,0 +1,10 @@
+# Credentials / Credenciales
+config.js
+
+# OS Files / Archivos del Sistema
+.DS_Store
+Thumbs.db
+
+# Idea / VSCode
+.vscode/
+.idea/
