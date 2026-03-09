@@ -1,11 +1,14 @@
-const CACHE_NAME = 'visionalert-cache-v3';
+const CACHE_NAME = 'visionalert-cache-v4';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
   './style.css',
   './app.js',
   './manifest.json',
-  './config.js.example'
+  './config.js.example',
+  './favicon.ico',
+  './logo192.png',
+  './logo512.png'
 ];
 
 self.addEventListener('install', (event) => {
