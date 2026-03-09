@@ -548,33 +548,37 @@ function handleTrigger(persons, cars, video) {
 }
 
 // [EN] ANIMATED BACKGROUND / [ES] FONDO ANIMADO
+// [EN] Dynamically generates SVG shapes for a lightweight, textured animated background without heavy performance hits.
+// [ES] Genera dinámicamente formas SVG para un fondo animado texturizado y ligero sin grandes impactos en el rendimiento.
 function initAnimatedBackground() {
     const bgContainer = document.getElementById('animated-bg');
     if (!bgContainer) return;
 
     const shapes = ['line', 'square', 'rect', 'triangle', 'pentagon'];
-    const colors = ['#00e5ff', '#00e676']; // Cyan and Green
-    const numShapes = 40; // Dense enough for texture
+    const colors = ['#00e5ff', '#00e676']; // [EN] Cyan and Green / [ES] Cian y Verde
+    const numShapes = 40; // [EN] Dense enough for texture / [ES] Suficiente densidad para dar textura
     const svgNS = "http://www.w3.org/2000/svg";
 
     for (let i = 0; i < numShapes; i++) {
+        // [EN] Randomize shape properties / [ES] Aleatorizar propiedades de forma
         const type = shapes[Math.floor(Math.random() * shapes.length)];
         const color = colors[Math.floor(Math.random() * colors.length)];
         const size = Math.random() * 8 + 6; // 6px to 14px (small texture)
         const duration = Math.random() * 40 + 30; // 30s to 70s
-        const delay = Math.random() * -70; // Start at random progress
+        const delay = Math.random() * -70; // [EN] Start at random progress / [ES] Iniciar en progreso aleatorio
         const leftPos = Math.random() * 100; // 0vw to 100vw
 
         const rootSvg = document.createElementNS(svgNS, "svg");
         rootSvg.setAttribute("class", "floating-shape");
         rootSvg.setAttribute("width", size * 2);
         rootSvg.setAttribute("height", size * 2);
-        rootSvg.setAttribute("viewBox", `0 0 ${size * 2} ${size * 2}`); // Critical for relative scaling
+        rootSvg.setAttribute("viewBox", `0 0 ${size * 2} ${size * 2}`); // [EN] Critical for relative scaling / [ES] Crítico para escalado relativo
         rootSvg.style.left = `${leftPos}vw`;
         rootSvg.style.animationDuration = `${duration}s`;
         rootSvg.style.animationDelay = `${delay}s`;
 
         let el;
+        // [EN] Generate geometric paths based on type / [ES] Generar rutas geométricas según el tipo
         if (type === 'line') {
             el = document.createElementNS(svgNS, "line");
             el.setAttribute("x1", "1"); el.setAttribute("y1", "1");
@@ -597,8 +601,9 @@ function initAnimatedBackground() {
             el.setAttribute("transform", `translate(${size * 0.4}, ${size * 0.4})`);
         }
 
-        el.setAttribute("stroke", color); // Apply explicitly to the inner element
-        el.setAttribute("stroke-width", "2"); // Explicit width
+        // [EN] Apply explicit stroke for visibility / [ES] Aplicar trazo explícito para visibilidad
+        el.setAttribute("stroke", color);
+        el.setAttribute("stroke-width", "2");
         el.setAttribute("fill", "none");
 
         rootSvg.appendChild(el);

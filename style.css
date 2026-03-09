@@ -477,3 +477,25 @@ button {
         font-size: 1.5rem;
     }
 }
+
+/* [EN] App Footer / [ES] Pie de Página */
+.app-footer {
+    text-align: center;
+    padding: 20px;
+    margin-top: 40px;
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.5);
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.app-footer a {
+    color: var(--accent-color);
+    text-decoration: none;
+    transition: opacity 0.2s;
+    opacity: 0.8;
+}
+
+.app-footer a:hover {
+    opacity: 1;
+    text-decoration: underline;
+}

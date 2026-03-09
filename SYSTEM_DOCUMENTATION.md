@@ -57,3 +57,5 @@ VisionAlert AI is an "Edge-Computing" application, meaning that data processing 
 - **Format**: PWA (Progressive Web App).
 - **Storage**: Supabase Storage (S3-compatible).
 - **Styling**: Glassmorphism with Digital/Neon accents.
+- **UI/UX**: Hardware-accelerated SVG animated background & custom SVG vector branding.
+- **License**: MIT License (Open Source, provided AS-IS without liability).

@@ -24,7 +24,7 @@ Esta aplicación funciona como un sistema de vigilancia "Inteligente y Autónomo
 
 1. Crea un proyecto en [Supabase](https://supabase.com/).
 2. Copia la URL de tu proyecto y la clave **`anon` `public`** (Settings > API).
-3. **Seguridad para GitHub**: 
+3. **Seguridad para GitHub**:
    - Notarás un archivo `config.js.example`. Cámbiale el nombre a `config.js`.
    - Pega tus credenciales dentro de ese archivo.
    - El archivo `config.js` está incluido en `.gitignore`, por lo que tus llaves nunca se subirán a GitHub si haces el repositorio público.
@@ -78,7 +78,7 @@ This application functions as an "Intelligent & Autonomous" surveillance system 
 
 1. Create a project on [Supabase](https://supabase.com/).
 2. Copy your Project URL and the **`anon` `public`** key (Settings > API).
-3. **GitHub Security**: 
+3. **GitHub Security**:
    - You will see a `config.js.example` file. Rename it to `config.js`.
    - Paste your credentials inside that file.
    - The `config.js` file is included in `.gitignore`, so your keys will never be uploaded to GitHub if you make the repository public.
@@ -109,3 +109,18 @@ Then open <http://127.0.0.1:3000> in your browser.
 To use the application on your phone, you must host it online (HTTPS is required for webcam access).
 
 - **Recommended Option**: [Netlify](https://www.netlify.com/) or [Vercel](https://vercel.com/) or GitHub Pages. Simply drag and drop the project folder into Netlify Drop, and you'll have a secure URL in seconds.
+
+---
+
+## 📜 License & Liability / Licencia y Responsabilidad
+
+### 🇪🇸 Español
+
+Este proyecto se distribuye bajo la **Licencia MIT**. Eres libre de usar, modificar y distribuir este software, incluso para uso comercial. Sin embargo, **el creador (Rodrigo Hernandez) no se hace responsable** por el mal uso de la aplicación, fallos en la detección de seguridad, o cualquier daño derivado del uso de este software. Esta herramienta se proporciona "tal cual" (AS IS) con propósitos de portafolio y demostración técnica.
+
+### 🇬🇧 English
+
+This project is licensed under the **MIT License**. You are free to use, modify, and distribute this software, including for commercial use. However, **the creator (Rodrigo Hernandez) assumes no liability** for misuse of the application, security detection failures, or any damages arising from the use of this software. This tool is provided "AS IS" for portfolio and technical demonstration purposes.
+
+---
+**Developed by [Rodrigo Hernandez](https://rodrigo.us)**
