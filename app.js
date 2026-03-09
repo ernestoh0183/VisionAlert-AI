@@ -305,8 +305,10 @@ function initRealtime() {
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'alerts', filter: `user_id=eq.${state.user.id}` }, payload => {
             try {
                 const audio = new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg');
-                audio.play().catch(e => console.log('Audio blocked', e));
-            } catch (e) { }
+                audio.play().catch(e => console.warn('Audio playback prevented by browser auto-play policy:', e));
+            } catch (err) {
+                console.error('Error attempting to play audio:', err);
+            }
 
             if (Notification.permission === 'granted') {
                 new Notification('VisionAlert: Detection!', { body: `Detected ${payload.new.quantity} ${payload.new.type}(s)` });
