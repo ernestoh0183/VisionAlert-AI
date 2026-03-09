@@ -26,6 +26,8 @@ window.app = {
 
 // [EN] Initialize Events on Load / [ES] Inicializar Eventos al Cargar
 document.addEventListener('DOMContentLoaded', () => {
+    initAnimatedBackground();
+
     // Clock
     setInterval(() => {
         const now = new Date();
@@ -481,11 +483,22 @@ function handleTrigger(persons, cars, video) {
     if (now - state.lastTrigger < state.cooldownMs) return;
     state.lastTrigger = now;
 
-    // Capture off-screen
+    // [EN] Image Optimization for Supabase (Max 800px width) / [ES] Optimización de Imagen para Supabase (Máximo 800px de ancho)
+    const MAX_WIDTH = 800;
+    let width = video.videoWidth;
+    let height = video.videoHeight;
+
+    if (width > MAX_WIDTH) {
+        const ratio = MAX_WIDTH / width;
+        width = MAX_WIDTH;
+        height = height * ratio;
+    }
+
+    // Capture off-screen and resize
     const captureCanvas = document.createElement('canvas');
-    captureCanvas.width = video.videoWidth;
-    captureCanvas.height = video.videoHeight;
-    captureCanvas.getContext('2d').drawImage(video, 0, 0, captureCanvas.width, captureCanvas.height);
+    captureCanvas.width = width;
+    captureCanvas.height = height;
+    captureCanvas.getContext('2d').drawImage(video, 0, 0, width, height);
 
     captureCanvas.toBlob(blob => {
         const type = (persons > 0 && cars > 0) ? 'mixed' : (persons > 0 ? 'person' : 'car');
@@ -529,5 +542,60 @@ function handleTrigger(persons, cars, video) {
         Promise.all([uploadAndInsertPromise, telegramPromise, updateODPromise])
             .catch(e => console.error('Trigger execution error:', e));
 
-    }, 'image/jpeg', 0.8);
+    }, 'image/jpeg', 0.7);
+}
+
+// [EN] ANIMATED BACKGROUND / [ES] FONDO ANIMADO
+function initAnimatedBackground() {
+    const bgContainer = document.getElementById('animated-bg');
+    if (!bgContainer) return;
+
+    const shapes = ['line', 'square', 'rect', 'triangle', 'pentagon'];
+    const colors = ['#00e5ff', '#00e676']; // Cyan and Green
+    const numShapes = 40; // Dense enough for texture
+    const svgNS = "http://www.w3.org/2000/svg";
+
+    for (let i = 0; i < numShapes; i++) {
+        const type = shapes[Math.floor(Math.random() * shapes.length)];
+        const color = colors[Math.floor(Math.random() * colors.length)];
+        const size = Math.random() * 8 + 6; // 6px to 14px (small texture)
+        const duration = Math.random() * 40 + 30; // 30s to 70s
+        const delay = Math.random() * -70; // Start at random progress
+        const leftPos = Math.random() * 100; // 0vw to 100vw
+
+        const rootSvg = document.createElementNS(svgNS, "svg");
+        rootSvg.setAttribute("class", "floating-shape");
+        rootSvg.setAttribute("width", size * 2);
+        rootSvg.setAttribute("height", size * 2);
+        rootSvg.style.left = `${leftPos}vw`;
+        rootSvg.style.animationDuration = `${duration}s`;
+        rootSvg.style.animationDelay = `${delay}s`;
+        rootSvg.style.stroke = color;
+
+        let el;
+        if (type === 'line') {
+            el = document.createElementNS(svgNS, "line");
+            el.setAttribute("x1", "0"); el.setAttribute("y1", "0");
+            el.setAttribute("x2", size); el.setAttribute("y2", size);
+        } else if (type === 'square') {
+            el = document.createElementNS(svgNS, "rect");
+            el.setAttribute("width", size); el.setAttribute("height", size);
+            el.setAttribute("x", size / 2); el.setAttribute("y", size / 2);
+        } else if (type === 'rect') {
+            el = document.createElementNS(svgNS, "rect");
+            el.setAttribute("width", size * 1.5); el.setAttribute("height", size * 0.8);
+            el.setAttribute("x", size / 4); el.setAttribute("y", size / 2);
+        } else if (type === 'triangle') {
+            el = document.createElementNS(svgNS, "polygon");
+            el.setAttribute("points", `${size},0 0,${size * 1.5} ${size * 2},${size * 1.5}`);
+        } else if (type === 'pentagon') {
+            el = document.createElementNS(svgNS, "polygon");
+            const s = size * 1.2;
+            el.setAttribute("points", `${s / 2},0 ${s},${s * 0.38} ${s * 0.81},${s} ${s * 0.19},${s} 0,${s * 0.38}`);
+            el.setAttribute("transform", `translate(${size * 0.4}, ${size * 0.4})`);
+        }
+
+        rootSvg.appendChild(el);
+        bgContainer.appendChild(rootSvg);
+    }
 }

@@ -49,6 +49,44 @@ body {
     background: radial-gradient(circle at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(0, 229, 255, 0.08), transparent 40%);
 }
 
+/* [EN] Animated Background / [ES] Fondo Animado */
+#animated-bg {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: -2;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.floating-shape {
+    position: absolute;
+    top: -10vh;
+    fill: none;
+    stroke-width: 1.5;
+    animation: floatShape linear infinite;
+    opacity: 0;
+}
+
+@keyframes floatShape {
+    0% {
+        transform: translateY(120vh) rotate(0deg);
+        opacity: 0;
+    }
+    10% {
+        opacity: 0.3;
+    }
+    90% {
+        opacity: 0.3;
+    }
+    100% {
+        transform: translateY(-20vh) rotate(360deg);
+        opacity: 0;
+    }
+}
+
 /* [EN] Layout Utilities / [ES] Utilidades de Diseño */
 .hidden {
     display: none !important;
