@@ -569,15 +569,15 @@ function initAnimatedBackground() {
         rootSvg.setAttribute("class", "floating-shape");
         rootSvg.setAttribute("width", size * 2);
         rootSvg.setAttribute("height", size * 2);
+        rootSvg.setAttribute("viewBox", `0 0 ${size * 2} ${size * 2}`); // Critical for relative scaling
         rootSvg.style.left = `${leftPos}vw`;
         rootSvg.style.animationDuration = `${duration}s`;
         rootSvg.style.animationDelay = `${delay}s`;
-        rootSvg.style.stroke = color;
 
         let el;
         if (type === 'line') {
             el = document.createElementNS(svgNS, "line");
-            el.setAttribute("x1", "0"); el.setAttribute("y1", "0");
+            el.setAttribute("x1", "1"); el.setAttribute("y1", "1");
             el.setAttribute("x2", size); el.setAttribute("y2", size);
         } else if (type === 'square') {
             el = document.createElementNS(svgNS, "rect");
@@ -589,13 +589,17 @@ function initAnimatedBackground() {
             el.setAttribute("x", size / 4); el.setAttribute("y", size / 2);
         } else if (type === 'triangle') {
             el = document.createElementNS(svgNS, "polygon");
-            el.setAttribute("points", `${size},0 0,${size * 1.5} ${size * 2},${size * 1.5}`);
+            el.setAttribute("points", `${size},1 1,${size * 1.5} ${size * 2 - 1},${size * 1.5}`);
         } else if (type === 'pentagon') {
             el = document.createElementNS(svgNS, "polygon");
             const s = size * 1.2;
-            el.setAttribute("points", `${s / 2},0 ${s},${s * 0.38} ${s * 0.81},${s} ${s * 0.19},${s} 0,${s * 0.38}`);
+            el.setAttribute("points", `${s / 2},1 ${s-1},${s * 0.38} ${s * 0.81},${s-1} ${s * 0.19},${s-1} 1,${s * 0.38}`);
             el.setAttribute("transform", `translate(${size * 0.4}, ${size * 0.4})`);
         }
+
+        el.setAttribute("stroke", color); // Apply explicitly to the inner element
+        el.setAttribute("stroke-width", "2"); // Explicit width
+        el.setAttribute("fill", "none");
 
         rootSvg.appendChild(el);
         bgContainer.appendChild(rootSvg);
