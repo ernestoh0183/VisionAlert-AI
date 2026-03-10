@@ -13,7 +13,8 @@ const state = {
     user: null, profile: null, model: null, cameraStream: null,
     isInferencing: false, lastTrigger: 0, cooldownMs: 30000,
     zone: null, videoDimensions: null, usageInterval: null,
-    drawing: false, drawStart: { x: 0, y: 0 }, alertsOffset: 0
+    drawing: false, drawStart: { x: 0, y: 0 }, alertsOffset: 0,
+    sessionReady: false // [EN] Gate for UI actions / [ES] Barrera para acciones de UI
 };
 
 // [EN] Global Exposure for navigation / [ES] Exposición Global para navegación
@@ -26,13 +27,15 @@ window.app = {
             stopCamera();
             stopUsageTracking();
             await flushUsageTrackingToDB();
-            // [EN] Sign out via Supabase. The `onAuthStateChange` SIGNED_OUT event will handle the page reload.
-            // [ES] Cerrar sesión via Supabase. El evento SIGNED_OUT en `onAuthStateChange` manejará la recarga.
-            try { await supabase.auth.signOut(); } catch (e) { console.warn(e); }
+            // [EN] Clear state immediately to prevent stale references / [ES] Limpiar estado para prevenir referencias obsoletas
+            state.user = null;
+            state.profile = null;
+            state.sessionReady = false;
             localStorage.removeItem('visionAlertLastView');
-            // [EN] Fallback: If SIGNED_OUT event fails to fire (e.g. stale token), force reload anyway after 1s
-            // [ES] Respaldo: Si el evento SIGNED_OUT falla al dispararse (ej. token caducado), forzar recarga tras 1s
-            setTimeout(() => window.location.replace(window.location.origin), 1000);
+            try { await supabase.auth.signOut(); } catch (e) { console.warn(e); }
+            // [EN] Force hard reset. Don't wait for events — this guarantees a clean slate.
+            // [ES] Forzar reinicio duro. No esperar eventos — esto garantiza una pizarra limpia.
+            window.location.replace(window.location.origin);
         }
     }
 };
@@ -84,7 +87,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-stop-camera').addEventListener('click', stopCamera);
     document.getElementById('btn-clear-zone').addEventListener('click', clearZone);
     document.getElementById('btn-request-notifications').addEventListener('click', requestNotifications);
-    // [EN] Independent Display Settings Save (separate from Telegram form) / [ES] Guardado Independiente de Ajustes de Visualización
+    // [EN] Independent Display Settings Save / [ES] Guardado Independiente de Ajustes de Visualización
     document.getElementById('btn-save-animations')?.addEventListener('click', saveAnimations);
 
     // [EN] Pagination / [ES] Paginación
@@ -103,40 +106,50 @@ document.addEventListener('DOMContentLoaded', () => {
         canvas.addEventListener('touchmove', (e) => { e.preventDefault(); doDraw(e.touches[0]); }, { passive: false });
         canvas.addEventListener('touchend', endDraw);
     }
-
-    // [EN] Proactively Fetch Session on Load (F5 Fix) / [ES] Obtener Sesión Proactivamente al Cargar (Arreglo F5)
-    supabase.auth.getSession().then(({ data: { session }, error }) => {
-        if (error) console.error("Session fetch error:", error);
-        if (session) {
-            handleSession(session);
-        } else {
-            document.getElementById('main-nav')?.classList.add('hidden');
-            navigate('auth');
-        }
-    });
-
-    // [EN] Listen for future auth state changes / [ES] Escuchar futuros cambios de estado de auth
-    supabase.auth.onAuthStateChange(async (event, session) => {
-        if (event === 'SIGNED_OUT') {
-            state.user = null;
-            state.profile = null;
-            window.location.replace(window.location.origin);
-        } else if (session && !state.user) {
-            handleSession(session);
-        }
-    });
 });
 
-// [EN] Session Bootstrapper / [ES] Inicializador de Sesión
-async function handleSession(session) {
-    if (state.user) return; // Prevent double-execution
-    state.user = session.user;
-    document.getElementById('main-nav')?.classList.remove('hidden');
-    await loadProfile();
-    const lastView = localStorage.getItem('visionAlertLastView') || 'dashboard';
-    navigate(lastView === 'auth' ? 'dashboard' : lastView);
-    initRealtime();
-}
+// =====================================================================
+// [EN] AUTH FLOW — SINGLE SOURCE OF TRUTH / [ES] FLUJO DE AUTH — FUENTE ÚNICA DE VERDAD
+// [EN] Supabase v2 fires INITIAL_SESSION immediately on subscribe, covering F5 reloads.
+// [EN] We do NOT call getSession() separately to avoid a race condition.
+// [ES] Supabase v2 dispara INITIAL_SESSION inmediatamente al suscribirse, cubriendo recargas F5.
+// [ES] NO llamamos getSession() por separado para evitar condiciones de carrera.
+// =====================================================================
+supabase.auth.onAuthStateChange(async (event, session) => {
+    console.log('[Auth]', event, session ? 'session exists' : 'no session');
+
+    if (event === 'SIGNED_OUT') {
+        state.user = null;
+        state.profile = null;
+        state.sessionReady = false;
+        document.getElementById('main-nav')?.classList.add('hidden');
+        navigate('auth');
+        return;
+    }
+
+    // [EN] For INITIAL_SESSION, SIGNED_IN, TOKEN_REFRESHED — hydrate state if not already hydrated
+    // [ES] Para INITIAL_SESSION, SIGNED_IN, TOKEN_REFRESHED — hidratar estado si no está ya hidratado
+    if (session && !state.sessionReady) {
+        state.user = session.user;
+        state.sessionReady = true;
+        document.getElementById('main-nav')?.classList.remove('hidden');
+        try {
+            await loadProfile();
+        } catch (e) {
+            console.error('[Auth] Failed to load profile:', e);
+        }
+        const lastView = localStorage.getItem('visionAlertLastView') || 'dashboard';
+        navigate(lastView === 'auth' ? 'dashboard' : lastView);
+        initRealtime();
+    }
+
+    // [EN] If there's no session and it's the initial load, show auth
+    // [ES] Si no hay sesión y es la carga inicial, mostrar auth
+    if (!session && event === 'INITIAL_SESSION') {
+        document.getElementById('main-nav')?.classList.add('hidden');
+        navigate('auth');
+    }
+});
 
 async function handleLogin(e) {
     e.preventDefault();
@@ -248,30 +261,32 @@ async function saveAnimations() {
     if (!animCheckbox || !status) return;
 
     const enableAnim = animCheckbox.checked;
-    status.textContent = 'Saving...';
 
-    if (!state.user?.id) {
-        status.textContent = 'Error: Not authenticated.';
-        status.className = 'error-msg';
-        return;
-    }
-
-    const { error } = await supabase.from('profiles').update({ enable_animations: enableAnim }).eq('id', state.user.id);
-    if (error) {
-        status.textContent = 'Error: ' + error.message;
-        status.className = 'error-msg';
-    } else {
-        state.profile = { ...state.profile, enable_animations: enableAnim };
-        // [EN] Apply animation change immediately / [ES] Aplicar el cambio de animación inmediatamente
-        if (enableAnim) {
-            initAnimatedBackground();
-        } else {
-            const bgContainer = document.getElementById('animated-bg');
-            if (bgContainer) bgContainer.innerHTML = '';
+    // [EN] If user is authenticated, persist to DB. Otherwise, just apply locally.
+    // [ES] Si el usuario está autenticado, persistir en BD. Si no, aplicar solo localmente.
+    if (state.user?.id) {
+        status.textContent = 'Saving...';
+        const { error } = await supabase.from('profiles').update({ enable_animations: enableAnim }).eq('id', state.user.id);
+        if (error) {
+            status.textContent = 'Error: ' + error.message;
+            status.className = 'error-msg';
+            return;
         }
+        if (state.profile) state.profile.enable_animations = enableAnim;
         status.textContent = 'Display settings saved!';
         status.className = 'success-msg';
         setTimeout(() => status.textContent = '', 3000);
+    }
+
+    // [EN] Also save to localStorage as a fast-access fallback / [ES] También guardar en localStorage como respaldo rápido
+    localStorage.setItem('visionAlertAnimations', enableAnim ? 'true' : 'false');
+
+    // [EN] Apply animation change immediately / [ES] Aplicar el cambio de animación inmediatamente
+    if (enableAnim) {
+        initAnimatedBackground();
+    } else {
+        const bgContainer = document.getElementById('animated-bg');
+        if (bgContainer) bgContainer.innerHTML = '';
     }
 }
 
@@ -280,10 +295,10 @@ function navigate(viewId) {
     if (viewId !== 'auth') localStorage.setItem('visionAlertLastView', viewId);
 
     document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
-    document.getElementById(`view-${viewId}`).classList.remove('hidden');
+    const targetView = document.getElementById(`view-${viewId}`);
+    if (targetView) targetView.classList.remove('hidden');
 
     if (viewId === 'camera') {
-        // startCamera(); // Removed as per instruction
         startUsageTracking();
     } else {
         stopCamera();
@@ -473,13 +488,7 @@ function appendAlertRow(alert, isAppend = false) {
         </td>
     `;
 
-    // If it's the initial load (which reverses order) or a Realtime insert, we generally want it at the top.
-    // However, for pagination, we are fetching history, so we APPEND to the bottom.
-    if (isAppend) {
-        tbody.appendChild(tr);
-    } else {
-        tbody.appendChild(tr); // In initial load, range(0,19) gives newest first. 
-    }
+    tbody.appendChild(tr);
 }
 
 // Separate function specifically for Realtime inserts (which always go to the top)
@@ -517,8 +526,7 @@ async function clearHistory() {
 }
 
 function initRealtime() {
-    if (!('Notification' in window)) return;
-    Notification.requestPermission();
+    if (!state.user) return;
 
     supabase.channel('public:alerts')
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'alerts', filter: `user_id=eq.${state.user.id}` }, payload => {
@@ -529,7 +537,7 @@ function initRealtime() {
                 console.error('Error attempting to play audio:', err);
             }
 
-            if (Notification.permission === 'granted') {
+            if ('Notification' in window && Notification.permission === 'granted') {
                 new Notification('VisionAlert: Detection!', { body: `Detected ${payload.new.quantity} ${payload.new.type}(s)` });
             }
             prependAlertRow(payload.new);
@@ -580,8 +588,10 @@ function stopCamera() {
         state.cameraStream.getTracks().forEach(t => t.stop());
         state.cameraStream = null;
     }
-    document.getElementById('camera-video').srcObject = null;
-    document.getElementById('ai-status').textContent = 'AI Status: Camera Stopped';
+    const video = document.getElementById('camera-video');
+    if (video) video.srcObject = null;
+    const aiStatus = document.getElementById('ai-status');
+    if (aiStatus) aiStatus.textContent = 'AI Status: Camera Stopped';
 }
 
 // [EN] DRAWING INTEREST ZONE LOGIC / [ES] LÓGICA DE DIBUJO DE ZONA DE INTERÉS
@@ -622,8 +632,8 @@ async function endDraw(e) {
 
 async function clearZone() {
     state.zone = null;
-    state.profile.interest_zone = null;
-    await supabase.from('profiles').update({ interest_zone: null }).eq('id', state.user.id);
+    if (state.profile) state.profile.interest_zone = null;
+    if (state.user) await supabase.from('profiles').update({ interest_zone: null }).eq('id', state.user.id);
 }
 
 function drawZone() {
@@ -824,10 +834,10 @@ function initAnimatedBackground() {
     // Clear previous shapes if any
     bgContainer.innerHTML = '';
 
-    // Check user preference
-    if (state.profile && state.profile.enable_animations === false) {
-        return; // Background stays blank/dark to save CPU/Battery
-    }
+    // [EN] Check localStorage first (fast), then profile setting / [ES] Verificar localStorage primero (rápido), luego la preferencia del perfil
+    const localPref = localStorage.getItem('visionAlertAnimations');
+    if (localPref === 'false') return;
+    if (state.profile && state.profile.enable_animations === false) return;
 
     const shapes = ['line', 'square', 'rect', 'triangle', 'pentagon'];
     const colors = ['#00e5ff', '#00e676']; // [EN] Cyan and Green / [ES] Cian y Verde
