@@ -245,6 +245,12 @@ select:focus {
     border-color: var(--accent-color);
 }
 
+/* [EN] Fix for white background in select dropdown options in Chromium / [ES] Arreglo para opciones blancas de select */
+select option {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+}
+
 .checkbox-label {
     display: block;
     margin-bottom: 15px;
