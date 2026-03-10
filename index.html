@@ -132,8 +132,20 @@
             <button id="btn-clear-history" class="btn-danger">Clear History</button>
         </div>
 
-        <div id="alerts-grid">
-            <!-- Dynamic alert cards will go here -->
+        <div class="table-responsive">
+            <table id="alerts-table" class="glass-table">
+                <thead>
+                    <tr>
+                        <th>Date & Time</th>
+                        <th>Type</th>
+                        <th>Quantity</th>
+                        <th>Evidence</th>
+                    </tr>
+                </thead>
+                <tbody id="alerts-tbody">
+                    <!-- Dynamic table rows will go here -->
+                </tbody>
+            </table>
         </div>
     </main>
 
@@ -145,8 +157,12 @@
         </div>
         <div class="camera-controls glass-panel">
             <p>Draw a rectangle on the video to define the "Zone of Interest"</p>
+            <div class="camera-power-actions">
+                <button id="btn-start-camera" class="btn-primary">Start Camera</button>
+                <button id="btn-stop-camera" class="btn-danger">Stop Camera</button>
+            </div>
             <button id="btn-clear-zone" class="btn-secondary">Clear Zone</button>
-            <p id="ai-status">AI Status: Loading Model...</p>
+            <p id="ai-status">AI Status: Waiting to Start...</p>
         </div>
     </main>
 

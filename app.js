@@ -74,6 +74,9 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('config-form').addEventListener('submit', saveConfig);
     document.getElementById('reset-trip').addEventListener('click', resetTrip);
     document.getElementById('btn-clear-history').addEventListener('click', clearHistory);
+    // Camera Power Controls
+    document.getElementById('btn-start-camera').addEventListener('click', startCamera);
+    document.getElementById('btn-stop-camera').addEventListener('click', stopCamera);
     document.getElementById('btn-clear-zone').addEventListener('click', clearZone);
     document.getElementById('btn-request-notifications').addEventListener('click', requestNotifications);
 
@@ -218,7 +221,7 @@ function navigate(viewId) {
     document.getElementById(`view-${viewId}`).classList.remove('hidden');
 
     if (viewId === 'camera') {
-        startCamera();
+        // startCamera(); // Removed as per instruction
         startUsageTracking();
     } else {
         stopCamera();
@@ -337,33 +340,35 @@ async function requestNotifications() {
 
 // [EN] ALERTS AND DASHBOARD LOGIC / [ES] LÓGICA DE ALERTAS Y DASHBOARD
 async function loadAlerts() {
-    const grid = document.getElementById('alerts-grid');
-    grid.innerHTML = '<p>Loading alerts...</p>';
+    const tbody = document.getElementById('alerts-tbody');
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align: center;">Loading alerts...</td></tr>';
     const { data, error } = await supabase.from('alerts').select('*').order('created_at', { ascending: false }).limit(20);
-    grid.innerHTML = '';
+
+    tbody.innerHTML = '';
     if (error || !data || data.length === 0) {
-        grid.innerHTML = '<p>No alerts yet.</p>';
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center;">No alerts yet.</td></tr>';
         return;
     }
-    data.reverse().forEach(alert => prependAlertCard(alert));
+    data.reverse().forEach(alert => prependAlertRow(alert));
 }
 
-function prependAlertCard(alert) {
-    const grid = document.getElementById('alerts-grid');
-    if (grid.innerHTML.includes('No alerts yet')) grid.innerHTML = '';
+function prependAlertRow(alert) {
+    const tbody = document.getElementById('alerts-tbody');
+    if (tbody.innerHTML.includes('No alerts yet')) tbody.innerHTML = '';
 
-    const div = document.createElement('div');
-    div.className = 'glass-card alert-card';
-    div.dataset.id = alert.id;
+    const tr = document.createElement('tr');
+    tr.dataset.id = alert.id;
     const date = new Date(alert.created_at).toLocaleString();
 
-    div.innerHTML = `
-        <h4>Alert: ${alert.type.toUpperCase()}</h4>
-        <small>${date}</small>
-        <p>Quantity: ${alert.quantity}</p>
-        ${alert.photo_url ? `<img src="${alert.photo_url}" alt="Alert photo" loading="lazy" class="alert-thumbnail" onclick="app.openImageModal(this.src)">` : ''}
+    tr.innerHTML = `
+        <td>${date}</td>
+        <td><strong>${alert.type.toUpperCase()}</strong></td>
+        <td>${alert.quantity}</td>
+        <td>
+            ${alert.photo_url ? `<img src="${alert.photo_url}" alt="Alert photo" loading="lazy" class="alert-thumbnail" onclick="app.openImageModal(this.src)">` : '<span style="opacity: 0.5;">No Image</span>'}
+        </td>
     `;
-    grid.prepend(div);
+    tbody.prepend(tr);
 }
 
 async function clearHistory() {
@@ -380,7 +385,7 @@ async function clearHistory() {
 
         if (data && data.length > 0) {
             data.forEach(deletedAlert => {
-                const el = document.querySelector(`.alert-card[data-id="${deletedAlert.id}"]`);
+                const el = document.querySelector(`tr[data-id="${deletedAlert.id}"]`);
                 if (el) {
                     el.classList.add('fade-out');
                     setTimeout(() => el.remove(), 500); // Wait for transition
@@ -406,7 +411,7 @@ function initRealtime() {
             if (Notification.permission === 'granted') {
                 new Notification('VisionAlert: Detection!', { body: `Detected ${payload.new.quantity} ${payload.new.type}(s)` });
             }
-            prependAlertCard(payload.new);
+            prependAlertRow(payload.new);
         }).subscribe();
 }
 
@@ -452,7 +457,10 @@ function stopCamera() {
     state.isInferencing = false;
     if (state.cameraStream) {
         state.cameraStream.getTracks().forEach(t => t.stop());
+        state.cameraStream = null;
     }
+    document.getElementById('camera-video').srcObject = null;
+    document.getElementById('ai-status').textContent = 'AI Status: Camera Stopped';
 }
 
 // [EN] DRAWING INTEREST ZONE LOGIC / [ES] LÓGICA DE DIBUJO DE ZONA DE INTERÉS
