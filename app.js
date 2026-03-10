@@ -21,6 +21,8 @@ window.app = {
     navigate,
     auth: {
         signOut: async () => { 
+            stopCamera();
+            stopUsageTracking();
             try { await supabase.auth.signOut(); } catch(e) { console.warn(e); }
             localStorage.removeItem('visionAlertLastView');
             window.location.replace(window.location.origin); 
@@ -294,21 +296,25 @@ function checkNotificationStatus() {
 async function requestNotifications() {
     if (!('Notification' in window)) return;
     
+    const sendTestNotification = (title, message) => {
+        if (navigator.serviceWorker) {
+            navigator.serviceWorker.ready.then(reg => {
+                reg.showNotification(title, { body: message, icon: './logo192.png' });
+            });
+        } else {
+            new Notification(title, { body: message, icon: './logo192.png' });
+        }
+    };
+
     if (Notification.permission === 'granted') {
-        new Notification('VisionAlert AI Test', {
-            body: 'Notifications are working correctly!',
-            icon: './logo192.png'
-        });
+        sendTestNotification('VisionAlert AI Test', 'Notifications are working correctly!');
         return;
     }
     
     const permission = await Notification.requestPermission();
     checkNotificationStatus();
     if (permission === 'granted') {
-        new Notification('VisionAlert AI', {
-            body: 'Notifications successfully enabled!',
-            icon: './logo192.png'
-        });
+        sendTestNotification('VisionAlert AI', 'Notifications successfully enabled!');
     }
 }
 
