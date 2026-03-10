@@ -20,7 +20,11 @@ const state = {
 window.app = {
     navigate,
     auth: {
-        signOut: async () => { await supabase.auth.signOut(); }
+        signOut: async () => { 
+            try { await supabase.auth.signOut(); } catch(e) { console.warn(e); }
+            localStorage.removeItem('visionAlertLastView');
+            window.location.replace(window.location.origin); 
+        }
     }
 };
 
@@ -35,19 +39,6 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('clock-m').textContent = String(now.getMinutes()).padStart(2, '0');
         document.getElementById('clock-s').textContent = String(now.getSeconds()).padStart(2, '0');
     }, 1000);
-
-    // [EN] Proactive session check for F5 Reloads / [ES] Verificación proactiva para recargas (F5)
-    (async () => {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session && !state.user) {
-            state.user = session.user;
-            document.getElementById('main-nav').classList.remove('hidden');
-            await loadProfile();
-            const lastView = localStorage.getItem('visionAlertLastView') || 'dashboard';
-            navigate(lastView === 'auth' ? 'dashboard' : lastView);
-            initRealtime();
-        }
-    })();
 
     // Glow Effect Pointer
     const updateMousePos = (e) => {
@@ -623,12 +614,21 @@ function handleTrigger(persons, cars, video) {
             trip_alerts: state.profile.trip_alerts
         }).eq('id', state.user.id);
 
-        // E: Browser Notification
+        // E: Browser Notification via Service Worker (More reliable for PWAs)
         if ('Notification' in window && Notification.permission === 'granted') {
-            new Notification('VisionAlert Detection', {
-                body: msg,
-                icon: './logo192.png'
-            });
+            if (navigator.serviceWorker) {
+                navigator.serviceWorker.ready.then(reg => {
+                    reg.showNotification('VisionAlert Detection', {
+                        body: msg,
+                        icon: './logo192.png'
+                    });
+                });
+            } else {
+                new Notification('VisionAlert Detection', {
+                    body: msg,
+                    icon: './logo192.png'
+                });
+            }
         }
 
         // Execute all promises simultaneously

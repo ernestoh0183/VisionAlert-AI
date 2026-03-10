@@ -46,6 +46,10 @@ CREATE POLICY "Users can insert own alerts" ON public.alerts FOR INSERT WITH CHE
 CREATE POLICY "Users can update own alerts" ON public.alerts FOR UPDATE USING (auth.uid() = user_id);
 CREATE POLICY "Users can delete own alerts" ON public.alerts FOR DELETE USING (auth.uid() = user_id);
 
+-- [EN] Enable Supabase Realtime for the alerts table (Required for Dashboard updates)
+-- [ES] Habilitar Supabase Realtime para la tabla de alertas (Requerido para actualizaciones del Dashboard)
+ALTER PUBLICATION supabase_realtime ADD TABLE public.alerts;
+
 -- [EN] Setup pg_cron for automatic deletion of alerts older than 7 days
 -- [ES] Configurar pg_cron para la eliminación automática de alertas con más de 7 días
 -- Enable extension if needed / Habilitar extensión si es necesario
