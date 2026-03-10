@@ -58,4 +58,6 @@ VisionAlert AI is an "Edge-Computing" application, meaning that data processing 
 - **Storage**: Supabase Storage (S3-compatible).
 - **Styling**: Glassmorphism with Digital/Neon accents.
 - **UI/UX**: Hardware-accelerated SVG animated background & custom SVG vector branding.
+- **State Management**: Explicit memory and WebSocket termination on `SIGNED_OUT` events to prevent browser freezing.
+- **Native Notifications**: Integration with standard HTML5 Notification API for cross-tab and cross-app background alerts.
 - **License**: MIT License (Open Source, provided AS-IS without liability).
