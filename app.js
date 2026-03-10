@@ -67,6 +67,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('reset-trip').addEventListener('click', resetTrip);
     document.getElementById('btn-clear-history').addEventListener('click', clearHistory);
     document.getElementById('btn-clear-zone').addEventListener('click', clearZone);
+    document.getElementById('btn-request-notifications').addEventListener('click', requestNotifications);
 
     // Canvas Listeners
     const canvas = document.getElementById('camera-canvas');
@@ -89,8 +90,14 @@ supabase.auth.onAuthStateChange(async (event, session) => {
     } else {
         state.user = null;
         state.profile = null;
-        document.getElementById('main-nav').classList.add('hidden');
-        navigate('auth');
+        // [EN] Force a hard reload on sign out to cleanly kill camera, TFJS model, and WebSockets
+        // [ES] Forzar recarga al cerrar sesión para limpiar la cámara, el modelo TFJS y los WebSockets
+        if (event === 'SIGNED_OUT') {
+            window.location.reload();
+        } else {
+            document.getElementById('main-nav').classList.add('hidden');
+            navigate('auth');
+        }
     }
 });
 
@@ -205,7 +212,10 @@ function navigate(viewId) {
         stopUsageTracking();
     }
 
-    if (viewId === 'dashboard') loadAlerts();
+    if (viewId === 'dashboard') {
+        loadAlerts();
+        checkNotificationStatus();
+    }
 }
 
 // [EN] ODOMETER & USAGE TRACKING / [ES] ODÓMETRO Y SEGUIMIENTO DE USO
@@ -240,6 +250,57 @@ function startUsageTracking() {
 
 function stopUsageTracking() {
     if (state.usageInterval) clearInterval(state.usageInterval);
+}
+
+// [EN] BROWSER NOTIFICATIONS / [ES] NOTIFICACIONES DEL NAVEGADOR
+function checkNotificationStatus() {
+    const statusEl = document.getElementById('notification-status');
+    const btnEl = document.getElementById('btn-request-notifications');
+    if (!statusEl || !btnEl) return;
+    
+    if (!('Notification' in window)) {
+        statusEl.textContent = 'Status: Not Supported by Browser';
+        statusEl.className = 'error-msg';
+        btnEl.style.display = 'none';
+        return;
+    }
+    
+    if (Notification.permission === 'granted') {
+        statusEl.textContent = 'Status: Enabled ✅';
+        statusEl.className = 'success-msg';
+        btnEl.textContent = 'Test Notification';
+        btnEl.style.display = 'inline-block';
+    } else if (Notification.permission === 'denied') {
+        statusEl.textContent = 'Status: Blocked (Fix in Browser Settings) ❌';
+        statusEl.className = 'error-msg';
+        btnEl.style.display = 'none';
+    } else {
+        statusEl.textContent = 'Status: Waiting for Permission ⚠️';
+        statusEl.className = '';
+        btnEl.textContent = 'Enable Notifications';
+        btnEl.style.display = 'inline-block';
+    }
+}
+
+async function requestNotifications() {
+    if (!('Notification' in window)) return;
+    
+    if (Notification.permission === 'granted') {
+        new Notification('VisionAlert AI Test', {
+            body: 'Notifications are working correctly!',
+            icon: './logo192.png'
+        });
+        return;
+    }
+    
+    const permission = await Notification.requestPermission();
+    checkNotificationStatus();
+    if (permission === 'granted') {
+        new Notification('VisionAlert AI', {
+            body: 'Notifications successfully enabled!',
+            icon: './logo192.png'
+        });
+    }
 }
 
 // [EN] ALERTS AND DASHBOARD LOGIC / [ES] LÓGICA DE ALERTAS Y DASHBOARD
@@ -539,6 +600,14 @@ function handleTrigger(persons, cars, video) {
             total_alerts: state.profile.total_alerts,
             trip_alerts: state.profile.trip_alerts
         }).eq('id', state.user.id);
+
+        // E: Browser Notification
+        if ('Notification' in window && Notification.permission === 'granted') {
+            new Notification('VisionAlert Detection', {
+                body: msg,
+                icon: './logo192.png'
+            });
+        }
 
         // Execute all promises simultaneously
         Promise.all([uploadAndInsertPromise, telegramPromise, updateODPromise])
