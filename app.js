@@ -715,6 +715,13 @@ async function clearHistory() {
     const statusEl = document.getElementById('cleanup-status');
     const btn = document.getElementById('btn-clear-history');
 
+    // Safety check BEFORE doing anything
+    const confirmMsg = hours === 0
+        ? "🚨 WARNING: This will permanently delete ALL your alerts and photos. Are you sure?"
+        : `Are you sure you want to permanently delete all alerts older than ${hours} hour(s)?`;
+
+    if (!window.confirm(confirmMsg)) return;
+
     if (statusEl) {
         statusEl.textContent = 'Clearing...';
         statusEl.className = '';
