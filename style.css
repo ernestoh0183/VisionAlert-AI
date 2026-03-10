@@ -617,10 +617,56 @@ button {
 
 .alert-thumbnail {
     cursor: pointer;
+    /* [EN] Constrain to thumbnail size in the table / [ES] Limitar a tamaño miniatura en la tabla */
+    width: 60px;
+    height: 45px;
+    object-fit: cover;
+    border-radius: 4px;
     transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.2s;
 }
 
 .alert-thumbnail:hover {
-    transform: scale(1.03);
-    box-shadow: 0 0 15px rgba(0, 229, 255, 0.4);
+    transform: scale(1.08);
+    box-shadow: 0 0 15px rgba(0, 229, 255, 0.5);
+}
+
+/* [EN] Alerts table styling / [ES] Estilos de la tabla de alertas */
+.glass-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+    font-size: 0.9rem;
+}
+
+.glass-table th,
+.glass-table td {
+    padding: 12px 15px;
+    text-align: left;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    vertical-align: middle;
+}
+
+.glass-table th {
+    color: var(--accent-color);
+    font-weight: 600;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    background: rgba(0, 229, 255, 0.05);
+}
+
+.glass-table tbody tr:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+/* [EN] Last column (Evidence) fixed width for thumbnail / [ES] Última columna (Evidencia) ancho fijo para miniatura */
+.glass-table td:last-child {
+    width: 80px;
+    text-align: center;
+}
+
+.table-responsive {
+    overflow-x: auto;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.07);
 }

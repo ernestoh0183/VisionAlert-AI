@@ -108,17 +108,22 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// =====================================================================
-// [EN] AUTH FLOW — SINGLE SOURCE OF TRUTH / [ES] FLUJO DE AUTH — FUENTE ÚNICA DE VERDAD
-// [EN] Supabase v2 fires INITIAL_SESSION immediately on subscribe, covering F5 reloads.
-// [EN] We do NOT call getSession() separately to avoid a race condition.
-// [ES] Supabase v2 dispara INITIAL_SESSION inmediatamente al suscribirse, cubriendo recargas F5.
-// [ES] NO llamamos getSession() por separado para evitar condiciones de carrera.
-// =====================================================================
+// =======================================================================
+// [EN] AUTH FLOW — SINGLE SOURCE OF TRUTH / [ES] FLUJO DE AUTH — FUENTE ÚINICA DE VERDAD
+//
+// [EN] CRITICAL: Supabase v2 fires INITIAL_SESSION with a null session BEFORE it finishes
+//      verifying the stored token from localStorage. The SIGNED_IN event fires ~1s later.
+//      So we MUST NOT navigate to 'auth' on a null INITIAL_SESSION. We wait for SIGNED_IN.
+// [ES] CRÍTICO: Supabase v2 dispara INITIAL_SESSION con sesión nula ANTES de terminar de
+//      verificar el token guardado en localStorage. El evento SIGNED_IN llega ~1s después.
+//      Por eso NO podemos navegar a 'auth' en un INITIAL_SESSION nulo. Esperamos SIGNED_IN.
+// =======================================================================
 supabase.auth.onAuthStateChange(async (event, session) => {
     console.log('[Auth]', event, session ? 'session exists' : 'no session');
 
     if (event === 'SIGNED_OUT') {
+        // [EN] This is the only reliable signal that the user truly has no session.
+        // [ES] Esta es la única señal confiable de que el usuario realmente no tiene sesión.
         state.user = null;
         state.profile = null;
         state.sessionReady = false;
@@ -127,9 +132,22 @@ supabase.auth.onAuthStateChange(async (event, session) => {
         return;
     }
 
-    // [EN] For INITIAL_SESSION, SIGNED_IN, TOKEN_REFRESHED — hydrate state if not already hydrated
-    // [ES] Para INITIAL_SESSION, SIGNED_IN, TOKEN_REFRESHED — hidratar estado si no está ya hidratado
-    if (session && !state.sessionReady) {
+    // [EN] INITIAL_SESSION fires with null session while the token is being verified.
+    // [EN] We IGNORE this case and wait for SIGNED_IN to provide the real session.
+    // [ES] INITIAL_SESSION se dispara con sesión nula mientras se verifica el token.
+    // [ES] IGNORAMOS este caso y esperamos SIGNED_IN para obtener la sesión real.
+    if (!session) {
+        // [EN] Only navigate to auth if we already know the user is not logged in.
+        // [ES] Solo navegar a auth si ya sabemos que el usuario no está logueado.
+        if (event === 'INITIAL_SESSION') {
+            console.log('[Auth] Waiting for token verification...');
+        }
+        return;
+    }
+
+    // [EN] Session exists and user is not yet hydrated: bootstrap the app.
+    // [ES] La sesión existe y el usuario aún no está hidratado: inicializar la app.
+    if (!state.sessionReady) {
         state.user = session.user;
         state.sessionReady = true;
         document.getElementById('main-nav')?.classList.remove('hidden');
@@ -143,13 +161,22 @@ supabase.auth.onAuthStateChange(async (event, session) => {
         initRealtime();
     }
 
-    // [EN] If there's no session and it's the initial load, show auth
-    // [ES] Si no hay sesión y es la carga inicial, mostrar auth
-    if (!session && event === 'INITIAL_SESSION') {
+    // [EN] INITIAL_SESSION with a valid session: user was logged in and page was reloaded.
+    // [ES] INITIAL_SESSION con sesión válida: el usuario estaba logueado y recargó la página.
+    if (event === 'INITIAL_SESSION' && session && state.sessionReady) {
+        console.log('[Auth] Session already hydrated, skipping re-init.');
+    }
+});
+
+// [EN] FALLBACK: If no auth event arrives after 3s, show login screen.
+// [ES] RESPALDO: Si no llega ningún evento de auth en 3s, mostrar pantalla de login.
+setTimeout(() => {
+    if (!state.sessionReady) {
+        console.log('[Auth] Timeout: No session received. Redirecting to auth.');
         document.getElementById('main-nav')?.classList.add('hidden');
         navigate('auth');
     }
-});
+}, 3000);
 
 async function handleLogin(e) {
     e.preventDefault();
