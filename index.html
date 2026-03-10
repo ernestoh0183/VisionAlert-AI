@@ -78,6 +78,7 @@
 
     <!-- [EN] CONFIG VIEW / [ES] VISTA DE CONFIGURACIÓN -->
     <main id="view-config" class="view-section hidden">
+        <!-- [EN] Telegram & Detection Card / [ES] Tarjeta de Telegram y Detección -->
         <div class="glass-card config-box">
             <h2>Configuration</h2>
             <form id="config-form">
@@ -89,12 +90,20 @@
 
                 <label class="checkbox-label"><input type="checkbox" id="detect-cars" checked> Detect Cars</label>
                 <label class="checkbox-label"><input type="checkbox" id="detect-persons" checked> Detect Persons</label>
-                <label class="checkbox-label" style="margin-top: 15px;"><input type="checkbox" id="enable-animations"
-                        checked> Enable Animated Background (Disable to save battery on old devices)</label>
 
                 <button type="submit" class="btn-primary" style="margin-top: 20px;">Save Configuration</button>
                 <p id="config-status"></p>
             </form>
+        </div>
+
+        <!-- [EN] Display Settings Card (independent from Telegram form) / [ES] Tarjeta de Ajustes de Visualización (independiente del formulario de Telegram) -->
+        <div class="glass-card config-box">
+            <h3 style="margin-bottom: 15px; color: var(--accent-color);">Display Settings</h3>
+            <label class="checkbox-label"><input type="checkbox" id="enable-animations" checked> Enable Animated
+                Background <small style="opacity:0.6;">(Disable to save battery on old devices)</small></label>
+            <button id="btn-save-animations" class="btn-secondary" style="margin-top: 10px;">Save Display
+                Settings</button>
+            <p id="animations-status"></p>
         </div>
     </main>
 

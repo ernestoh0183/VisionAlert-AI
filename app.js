@@ -26,9 +26,12 @@ window.app = {
             stopCamera();
             stopUsageTracking();
             await flushUsageTrackingToDB();
+            // [EN] Sign out via Supabase. The `onAuthStateChange` SIGNED_OUT event will handle the page reload.
+            // [ES] Cerrar sesión via Supabase. El evento SIGNED_OUT en `onAuthStateChange` manejará la recarga.
             try { await supabase.auth.signOut(); } catch (e) { console.warn(e); }
             localStorage.removeItem('visionAlertLastView');
-            window.location.replace(window.location.origin);
+            // [EN] Do NOT call window.location.replace here - let the onAuthStateChange handler do the reload.
+            // [ES] NO llamar window.location.replace acá - dejar que el manejador de onAuthStateChange recargue.
         }
     }
 };
@@ -75,11 +78,13 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('config-form').addEventListener('submit', saveConfig);
     document.getElementById('reset-trip').addEventListener('click', resetTrip);
     document.getElementById('btn-clear-history').addEventListener('click', clearHistory);
-    // Camera Power Controls
+    // [EN] Camera Power Controls / [ES] Controles de Encendido de Cámara
     document.getElementById('btn-start-camera').addEventListener('click', startCamera);
     document.getElementById('btn-stop-camera').addEventListener('click', stopCamera);
     document.getElementById('btn-clear-zone').addEventListener('click', clearZone);
     document.getElementById('btn-request-notifications').addEventListener('click', requestNotifications);
+    // [EN] Independent Display Settings Save (separate from Telegram form) / [ES] Guardado Independiente de Ajustes de Visualización
+    document.getElementById('btn-save-animations')?.addEventListener('click', saveAnimations);
 
     // [EN] Pagination / [ES] Paginación
     document.getElementById('btn-load-more')?.addEventListener('click', () => {
@@ -200,15 +205,11 @@ async function saveConfig(e) {
     const status = document.getElementById('config-status');
     status.textContent = 'Saving...';
 
-    const animCheckbox = document.getElementById('enable-animations');
-    const enableAnim = animCheckbox ? animCheckbox.checked : true;
-
     const updates = {
         telegram_token: document.getElementById('telegram-token').value,
         telegram_chat_id: document.getElementById('telegram-chat-id').value,
         detect_cars: document.getElementById('detect-cars').checked,
         detect_persons: document.getElementById('detect-persons').checked,
-        enable_animations: enableAnim
     };
 
     if (!state.user?.id) {
@@ -223,16 +224,41 @@ async function saveConfig(e) {
         status.className = 'error-msg';
     } else {
         state.profile = { ...state.profile, ...updates };
+        status.textContent = 'Configuration saved!';
+        status.className = 'success-msg';
+        setTimeout(() => status.textContent = '', 3000);
+    }
+}
 
-        // Reboot or clear background based on setting
+// [EN] Save animated background preference independently / [ES] Guardar preferencia de fondo animado de forma independiente
+async function saveAnimations() {
+    const animCheckbox = document.getElementById('enable-animations');
+    const status = document.getElementById('animations-status');
+    if (!animCheckbox || !status) return;
+
+    const enableAnim = animCheckbox.checked;
+    status.textContent = 'Saving...';
+
+    if (!state.user?.id) {
+        status.textContent = 'Error: Not authenticated.';
+        status.className = 'error-msg';
+        return;
+    }
+
+    const { error } = await supabase.from('profiles').update({ enable_animations: enableAnim }).eq('id', state.user.id);
+    if (error) {
+        status.textContent = 'Error: ' + error.message;
+        status.className = 'error-msg';
+    } else {
+        state.profile = { ...state.profile, enable_animations: enableAnim };
+        // [EN] Apply animation change immediately / [ES] Aplicar el cambio de animación inmediatamente
         if (enableAnim) {
             initAnimatedBackground();
         } else {
             const bgContainer = document.getElementById('animated-bg');
             if (bgContainer) bgContainer.innerHTML = '';
         }
-
-        status.textContent = 'Configuration saved!';
+        status.textContent = 'Display settings saved!';
         status.className = 'success-msg';
         setTimeout(() => status.textContent = '', 3000);
     }
