@@ -22,20 +22,20 @@ window.app = {
     openImageModal,
     closeImageModal,
     auth: {
-        signOut: () => {
-            // [EN] SYNCHRONOUS cleanup — no awaiting anything that could hang.
-            // [ES] Limpieza SÍNCRONA — no esperar nada que pueda colgarse.
+        signOut: async () => {
             stopCamera();
             stopUsageTracking();
-            // [EN] Fire-and-forget flush: don't await, just let it try in background
-            // [ES] Flush sin espera: no esperar, solo dejar que intente en segundo plano
+            // [EN] Fire-and-forget flush: don't block logout on a DB write
+            // [ES] Flush sin espera: no bloquear logout por una escritura a BD
             flushUsageTrackingToDB().catch(() => { });
             state.user = null;
             state.profile = null;
             localStorage.removeItem('visionAlertLastView');
-            supabase.auth.signOut().catch(() => { });
-            // [EN] Immediate hard redirect — guaranteed to work, no dependencies.
-            // [ES] Redirección dura inmediata — garantizada, sin dependencias.
+            // [EN] MUST await signOut so the token is cleared from localStorage BEFORE we reload.
+            // [EN] Without await: page reloads -> getSession() finds old token -> re-authenticates!
+            // [ES] DEBE esperar signOut para que el token se borre de localStorage ANTES de recargar.
+            // [ES] Sin await: página recarga -> getSession() encuentra viejo token -> re-autentica!
+            try { await supabase.auth.signOut(); } catch (e) { console.warn('signOut error:', e); }
             window.location.replace(window.location.origin);
         }
     }
