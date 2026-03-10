@@ -712,16 +712,33 @@ function prependAlertRow(alert) {
  */
 async function clearHistory() {
     const hours = parseInt(document.getElementById('cleanup-timeframe').value, 10);
-    const timeLimit = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+    const statusEl = document.getElementById('cleanup-status');
+    const btn = document.getElementById('btn-clear-history');
+
+    if (statusEl) {
+        statusEl.textContent = 'Clearing...';
+        statusEl.className = '';
+    }
+    if (btn) btn.disabled = true;
 
     try {
-        const { data, error } = await supabase.from('alerts')
-            .delete()
-            .lt('created_at', timeLimit)
-            .select(); // Ask Supabase to return the rows it deleted so we can remove them visually
+        let query = supabase.from('alerts').delete();
+
+        // If hours is 0, it means "All Time", so we don't apply the .lt filter
+        // If hours > 0, we only delete rows older than the specified hours
+        if (hours > 0) {
+            const timeLimit = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+            query = query.lt('created_at', timeLimit);
+        } else {
+            // For 'All Time', we must provide a filter because Supabase JS requires one for deletes
+            query = query.eq('user_id', state.user.id);
+        }
+
+        const { data, error } = await query.select(); // Ask Supabase to return the rows it deleted
 
         if (error) throw error;
 
+        // Visual feedback
         if (data && data.length > 0) {
             data.forEach(deletedAlert => {
                 const el = document.querySelector(`tr[data-id="${deletedAlert.id}"]`);
@@ -730,8 +747,26 @@ async function clearHistory() {
                     setTimeout(() => el.remove(), 500);
                 }
             });
+            if (statusEl) {
+                statusEl.textContent = `Successfully deleted ${data.length} alert(s).`;
+                statusEl.className = 'success-msg';
+            }
+        } else {
+            if (statusEl) {
+                statusEl.textContent = 'No matching alerts found to delete. (They might be too recent).';
+                statusEl.className = '';
+            }
         }
-    } catch (e) { console.error('Failed to clear history:', e); }
+    } catch (e) {
+        console.error('Failed to clear history:', e);
+        if (statusEl) {
+            statusEl.textContent = `Error: ${e.message}`;
+            statusEl.className = 'error-msg';
+        }
+    } finally {
+        if (btn) btn.disabled = false;
+        if (statusEl) setTimeout(() => statusEl.textContent = '', 4000);
+    }
 }
 
 /**
