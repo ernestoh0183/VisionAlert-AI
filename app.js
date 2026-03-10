@@ -36,6 +36,19 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('clock-s').textContent = String(now.getSeconds()).padStart(2, '0');
     }, 1000);
 
+    // [EN] Proactive session check for F5 Reloads / [ES] Verificación proactiva para recargas (F5)
+    (async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session && !state.user) {
+            state.user = session.user;
+            document.getElementById('main-nav').classList.remove('hidden');
+            await loadProfile();
+            const lastView = localStorage.getItem('visionAlertLastView') || 'dashboard';
+            navigate(lastView === 'auth' ? 'dashboard' : lastView);
+            initRealtime();
+        }
+    })();
+
     // Glow Effect Pointer
     const updateMousePos = (e) => {
         const clientX = e.clientX || (e.touches && e.touches[0].clientX);
@@ -82,11 +95,14 @@ document.addEventListener('DOMContentLoaded', () => {
 // [EN] AUTH FLOW & SESSION / [ES] FLUJO DE AUTENTICACIÓN Y SESIÓN
 supabase.auth.onAuthStateChange(async (event, session) => {
     if (session) {
-        state.user = session.user;
-        document.getElementById('main-nav').classList.remove('hidden');
-        await loadProfile();
-        navigate('dashboard');
-        initRealtime();
+        if (!state.user) {
+            state.user = session.user;
+            document.getElementById('main-nav').classList.remove('hidden');
+            await loadProfile();
+            const lastView = localStorage.getItem('visionAlertLastView') || 'dashboard';
+            navigate(lastView === 'auth' ? 'dashboard' : lastView);
+            initRealtime();
+        }
     } else {
         state.user = null;
         state.profile = null;
@@ -201,6 +217,8 @@ async function saveConfig(e) {
 
 // [EN] UI LOGIC & VIEWS SWITCHING / [ES] LÓGICA DE INTERFAZ Y CAMBIO DE VISTAS
 function navigate(viewId) {
+    if (viewId !== 'auth') localStorage.setItem('visionAlertLastView', viewId);
+    
     document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
     document.getElementById(`view-${viewId}`).classList.remove('hidden');
 
@@ -506,8 +524,12 @@ async function inferenceLoop() {
         let cCount = 0;
 
         predictions.forEach(p => {
-            const isTarget = (p.class === 'person' && state.profile.detect_persons) ||
-                (p.class === 'car' && state.profile.detect_cars);
+            // [EN] Default to true if profile is somehow missing the property
+            const detectPersons = state.profile?.detect_persons !== false;
+            const detectCars = state.profile?.detect_cars !== false;
+            
+            const isTarget = (p.class === 'person' && detectPersons) ||
+                (p.class === 'car' && detectCars);
             if (!isTarget) return;
 
             const [x, y, w, h] = p.bbox;
