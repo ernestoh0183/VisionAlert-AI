@@ -13,7 +13,7 @@ const state = {
     user: null, profile: null, model: null, cameraStream: null,
     isInferencing: false, lastTrigger: 0, cooldownMs: 30000,
     zone: null, videoDimensions: null, usageInterval: null,
-    drawing: false, drawStart: { x: 0, y: 0 }
+    drawing: false, drawStart: { x: 0, y: 0 }, alertsOffset: 0
 };
 
 // [EN] Global Exposure for navigation / [ES] Exposición Global para navegación
@@ -80,6 +80,12 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-stop-camera').addEventListener('click', stopCamera);
     document.getElementById('btn-clear-zone').addEventListener('click', clearZone);
     document.getElementById('btn-request-notifications').addEventListener('click', requestNotifications);
+
+    // [EN] Pagination / [ES] Paginación
+    document.getElementById('btn-load-more')?.addEventListener('click', () => {
+        state.alertsOffset += 20;
+        loadAlerts(true);
+    });
 
     // Canvas Listeners
     const canvas = document.getElementById('camera-canvas');
@@ -249,6 +255,7 @@ function navigate(viewId) {
     }
 
     if (viewId === 'dashboard') {
+        state.alertsOffset = 0; // Reset offset when entering dashboard
         loadAlerts();
         checkNotificationStatus();
     }
@@ -369,20 +376,50 @@ async function requestNotifications() {
 }
 
 // [EN] ALERTS AND DASHBOARD LOGIC / [ES] LÓGICA DE ALERTAS Y DASHBOARD
-async function loadAlerts() {
+async function loadAlerts(isAppend = false) {
     const tbody = document.getElementById('alerts-tbody');
-    tbody.innerHTML = '<tr><td colspan="4" style="text-align: center;">Loading alerts...</td></tr>';
-    const { data, error } = await supabase.from('alerts').select('*').order('created_at', { ascending: false }).limit(20);
+    const loadBtn = document.getElementById('btn-load-more');
+    if (!tbody) return;
 
-    tbody.innerHTML = '';
-    if (error || !data || data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center;">No alerts yet.</td></tr>';
+    if (!isAppend) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center;">Loading alerts...</td></tr>';
+    } else {
+        const tr = document.createElement('tr');
+        tr.id = 'loading-row';
+        tr.innerHTML = '<td colspan="4" style="text-align: center;">Loading more...</td>';
+        tbody.appendChild(tr);
+        if (loadBtn) loadBtn.disabled = true;
+    }
+
+    const { data, error } = await supabase.from('alerts').select('*')
+        .order('created_at', { ascending: false })
+        .range(state.alertsOffset, state.alertsOffset + 19);
+
+    if (document.getElementById('loading-row')) document.getElementById('loading-row').remove();
+    if (!isAppend) tbody.innerHTML = '';
+
+    if (loadBtn) {
+        loadBtn.disabled = false;
+        loadBtn.style.display = (data && data.length === 20) ? 'block' : 'none';
+        if (data && data.length < 20 && isAppend) {
+            loadBtn.style.display = 'block';
+            loadBtn.textContent = 'No more alerts';
+            loadBtn.disabled = true;
+        } else if (loadBtn.textContent === 'No more alerts') {
+            loadBtn.textContent = 'Load More Alerts'; // Reset
+        }
+    }
+
+    if (error || !data || (data.length === 0 && !isAppend)) {
+        if (!isAppend) tbody.innerHTML = '<tr><td colspan="4" style="text-align: center;">No alerts yet.</td></tr>';
         return;
     }
-    data.reverse().forEach(alert => prependAlertRow(alert));
+
+    // Append older alerts to the bottom
+    data.forEach(alert => appendAlertRow(alert, isAppend));
 }
 
-function prependAlertRow(alert) {
+function appendAlertRow(alert, isAppend = false) {
     const tbody = document.getElementById('alerts-tbody');
     if (tbody.innerHTML.includes('No alerts yet')) tbody.innerHTML = '';
 
@@ -398,6 +435,23 @@ function prependAlertRow(alert) {
             ${alert.photo_url ? `<img src="${alert.photo_url}" alt="Alert photo" loading="lazy" class="alert-thumbnail" onclick="app.openImageModal(this.src)">` : '<span style="opacity: 0.5;">No Image</span>'}
         </td>
     `;
+
+    // If it's the initial load (which reverses order) or a Realtime insert, we generally want it at the top.
+    // However, for pagination, we are fetching history, so we APPEND to the bottom.
+    if (isAppend) {
+        tbody.appendChild(tr);
+    } else {
+        tbody.appendChild(tr); // In initial load, range(0,19) gives newest first. 
+    }
+}
+
+// Separate function specifically for Realtime inserts (which always go to the top)
+function prependAlertRow(alert) {
+    const tbody = document.getElementById('alerts-tbody');
+    if (tbody.innerHTML.includes('No alerts yet')) tbody.innerHTML = '';
+    const tr = document.createElement('tr');
+    tr.dataset.id = alert.id;
+    tr.innerHTML = `<td>${new Date(alert.created_at).toLocaleString()}</td><td><strong>${alert.type.toUpperCase()}</strong></td><td>${alert.quantity}</td><td>${alert.photo_url ? `<img src="${alert.photo_url}" class="alert-thumbnail" onclick="app.openImageModal(this.src)">` : '<span style="opacity: 0.5;">No Image</span>'}</td>`;
     tbody.prepend(tr);
 }
 
@@ -619,6 +673,10 @@ function handleTrigger(persons, cars, video) {
     const now = Date.now();
     if (now - state.lastTrigger < state.cooldownMs) return;
     state.lastTrigger = now;
+
+    // [EN] Visual Alarm Feedback / [ES] Retroalimentación Visual de Alarma
+    document.body.classList.add('alarm-flash');
+    setTimeout(() => document.body.classList.remove('alarm-flash'), 2000);
 
     // [EN] Image Optimization for Supabase (Max 800px width) / [ES] Optimización de Imagen para Supabase (Máximo 800px de ancho)
     const MAX_WIDTH = 800;

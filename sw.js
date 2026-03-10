@@ -1,4 +1,4 @@
-const CACHE_NAME = 'visionalert-cache-v12';
+const CACHE_NAME = 'visionalert-cache-v13';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

@@ -1,6 +1,6 @@
--- [EN] CLEAN UP EXISTING EXPERIMENTAL TABLES / [ES] LIMPIAR TABLAS EXPERIMENTALES EXISTENTES
-DROP TABLE IF EXISTS public.alerts CASCADE;
-DROP TABLE IF EXISTS public.profiles CASCADE;
+-- [EN] VISIONALERT AI PRIMARY SCHEMA / [ES] ESQUEMA PRINCIPAL DE VISIONALERT AI
+-- [EN] Note: For a clean reset, run 'schema_reset.sql' first.
+-- [ES] Nota: Para un reinicio limpio, ejecuta 'schema_reset.sql' primero.
 
 -- [EN] Create profiles table for user settings and statistics
 -- [ES] Crear tabla de perfiles para configuraciones y estadísticas del usuario
