@@ -25,6 +25,7 @@ window.app = {
         signOut: async () => {
             stopCamera();
             stopUsageTracking();
+            await flushUsageTrackingToDB();
             try { await supabase.auth.signOut(); } catch (e) { console.warn(e); }
             localStorage.removeItem('visionAlertLastView');
             window.location.replace(window.location.origin);
@@ -179,6 +180,11 @@ async function loadProfile() {
     document.getElementById('telegram-chat-id').value = state.profile.telegram_chat_id || '';
     document.getElementById('detect-cars').checked = state.profile.detect_cars ?? true;
     document.getElementById('detect-persons').checked = state.profile.detect_persons ?? true;
+
+    // Checkbox for animations (defaults to true if undefined)
+    const animCheckbox = document.getElementById('enable-animations');
+    if (animCheckbox) animCheckbox.checked = state.profile.enable_animations ?? true;
+
     state.zone = state.profile.interest_zone || null;
     updateOdometerUI();
 }
@@ -188,11 +194,15 @@ async function saveConfig(e) {
     const status = document.getElementById('config-status');
     status.textContent = 'Saving...';
 
+    const animCheckbox = document.getElementById('enable-animations');
+    const enableAnim = animCheckbox ? animCheckbox.checked : true;
+
     const updates = {
         telegram_token: document.getElementById('telegram-token').value,
         telegram_chat_id: document.getElementById('telegram-chat-id').value,
         detect_cars: document.getElementById('detect-cars').checked,
-        detect_persons: document.getElementById('detect-persons').checked
+        detect_persons: document.getElementById('detect-persons').checked,
+        enable_animations: enableAnim
     };
 
     if (!state.user?.id) {
@@ -207,6 +217,15 @@ async function saveConfig(e) {
         status.className = 'error-msg';
     } else {
         state.profile = { ...state.profile, ...updates };
+
+        // Reboot or clear background based on setting
+        if (enableAnim) {
+            initAnimatedBackground();
+        } else {
+            const bgContainer = document.getElementById('animated-bg');
+            if (bgContainer) bgContainer.innerHTML = '';
+        }
+
         status.textContent = 'Configuration saved!';
         status.className = 'success-msg';
         setTimeout(() => status.textContent = '', 3000);
@@ -226,6 +245,7 @@ function navigate(viewId) {
     } else {
         stopCamera();
         stopUsageTracking();
+        flushUsageTrackingToDB();
     }
 
     if (viewId === 'dashboard') {
@@ -267,20 +287,30 @@ async function resetTrip() {
 
 function startUsageTracking() {
     if (state.usageInterval) clearInterval(state.usageInterval);
-    state.usageInterval = setInterval(async () => {
+    state.usageInterval = setInterval(() => {
         if (!state.profile) return;
         state.profile.total_usage_minutes++;
         state.profile.trip_usage_minutes++;
         updateOdometerUI();
-        await supabase.from('profiles').update({
-            total_usage_minutes: state.profile.total_usage_minutes,
-            trip_usage_minutes: state.profile.trip_usage_minutes
-        }).eq('id', state.user.id);
+        // Memory buffered. Will flush to DB implicitly when camera stops or user logs out.
     }, 60000); // 1 minute
 }
 
 function stopUsageTracking() {
-    if (state.usageInterval) clearInterval(state.usageInterval);
+    if (state.usageInterval) {
+        clearInterval(state.usageInterval);
+        state.usageInterval = null;
+    }
+}
+
+async function flushUsageTrackingToDB() {
+    if (!state.user || !state.profile) return;
+    try {
+        await supabase.from('profiles').update({
+            total_usage_minutes: state.profile.total_usage_minutes,
+            trip_usage_minutes: state.profile.trip_usage_minutes
+        }).eq('id', state.user.id);
+    } catch (e) { console.error('Error flushing odometer to DB', e); }
 }
 
 // [EN] BROWSER NOTIFICATIONS / [ES] NOTIFICACIONES DEL NAVEGADOR
@@ -629,17 +659,31 @@ function handleTrigger(persons, cars, video) {
                 photo_url: publicUrl
             }));
 
-        // C: Prepare Telegram Send
+        // C: Prepare Telegram Send (Edge Function primarily, direct fetch as fallback)
         let telegramPromise = Promise.resolve();
         if (state.profile.telegram_token && state.profile.telegram_chat_id) {
             const fd = new FormData();
             fd.append('chat_id', state.profile.telegram_chat_id);
-            fd.append('photo', blob, fileName);
+            fd.append('token', state.profile.telegram_token);
             fd.append('caption', msg);
-            telegramPromise = fetch(`https://api.telegram.org/bot${state.profile.telegram_token}/sendPhoto`, {
-                method: 'POST',
-                body: fd
-            }).catch(e => console.error('Telegram error:', e));
+            fd.append('photo', blob, fileName);
+
+            telegramPromise = supabase.functions.invoke('telegram-webhook', {
+                body: fd,
+            }).then(({ data, error }) => {
+                if (error || !data?.success) throw new Error('Edge Function failed or not deployed.');
+                return data;
+            }).catch(e => {
+                console.warn('Fallback to direct Telegram API due to Edge Function error:', e.message);
+                const fallbackFd = new FormData();
+                fallbackFd.append('chat_id', state.profile.telegram_chat_id);
+                fallbackFd.append('photo', blob, fileName);
+                fallbackFd.append('caption', msg);
+                return fetch(`https://api.telegram.org/bot${state.profile.telegram_token}/sendPhoto`, {
+                    method: 'POST',
+                    body: fallbackFd
+                });
+            }).catch(err => console.error('Total Telegram failure:', err));
         }
 
         // D: Update Odometer Database
@@ -681,6 +725,14 @@ function handleTrigger(persons, cars, video) {
 function initAnimatedBackground() {
     const bgContainer = document.getElementById('animated-bg');
     if (!bgContainer) return;
+
+    // Clear previous shapes if any
+    bgContainer.innerHTML = '';
+
+    // Check user preference
+    if (state.profile && state.profile.enable_animations === false) {
+        return; // Background stays blank/dark to save CPU/Battery
+    }
 
     const shapes = ['line', 'square', 'rect', 'triangle', 'pentagon'];
     const colors = ['#00e5ff', '#00e676']; // [EN] Cyan and Green / [ES] Cian y Verde

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -14,6 +15,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
 </head>
+
 <body>
     <div id="glow-pointer"></div>
     <div id="animated-bg"></div>
@@ -25,7 +27,8 @@
         </div>
         <div class="header-right">
             <div id="system-clock" class="digital-clock">
-                <span id="clock-h">00</span><span class="colon">:</span><span id="clock-m">00</span><span class="colon">:</span><span id="clock-s">00</span>
+                <span id="clock-h">00</span><span class="colon">:</span><span id="clock-m">00</span><span
+                    class="colon">:</span><span id="clock-s">00</span>
             </div>
             <svg class="status-indicator" width="16" height="16" viewBox="0 0 16 16">
                 <circle cx="8" cy="8" r="6" fill="#00e676" class="pulse-active"></circle>
@@ -80,14 +83,16 @@
             <form id="config-form">
                 <label>Telegram Bot Token:</label>
                 <input type="text" id="telegram-token" placeholder="123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11">
-                
+
                 <label>Telegram Chat ID:</label>
                 <input type="text" id="telegram-chat-id" placeholder="123456789">
-                
+
                 <label class="checkbox-label"><input type="checkbox" id="detect-cars" checked> Detect Cars</label>
                 <label class="checkbox-label"><input type="checkbox" id="detect-persons" checked> Detect Persons</label>
-                
-                <button type="submit" class="btn-primary">Save Configuration</button>
+                <label class="checkbox-label" style="margin-top: 15px;"><input type="checkbox" id="enable-animations"
+                        checked> Enable Animated Background (Disable to save battery on old devices)</label>
+
+                <button type="submit" class="btn-primary" style="margin-top: 20px;">Save Configuration</button>
                 <p id="config-status"></p>
             </form>
         </div>
@@ -111,7 +116,8 @@
 
         <div class="glass-card notification-controls" style="margin-top: 20px; margin-bottom: 20px;">
             <h3>Device Notifications</h3>
-            <p style="margin-bottom: 10px; font-size: 0.9rem; opacity: 0.8;">Receive audio and visual popup alerts directly on this device when the app is running in the background.</p>
+            <p style="margin-bottom: 10px; font-size: 0.9rem; opacity: 0.8;">Receive audio and visual popup alerts
+                directly on this device when the app is running in the background.</p>
             <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
                 <p id="notification-status" style="margin: 0; font-weight: bold;">Status: Checking...</p>
                 <button id="btn-request-notifications" class="btn-secondary">Manage Notifications</button>
@@ -174,11 +180,13 @@
 
     <footer class="app-footer">
         <p>
-            Developed by <a href="https://rodrigo.us" target="_blank" rel="noopener noreferrer">Rodrigo Hernandez</a> | 
-            <a href="https://github.com/ernestoh0183/VisionAlert-AI" target="_blank" rel="noopener noreferrer">GitHub Repo</a>
+            Developed by <a href="https://rodrigo.us" target="_blank" rel="noopener noreferrer">Rodrigo Hernandez</a> |
+            <a href="https://github.com/ernestoh0183/VisionAlert-AI" target="_blank" rel="noopener noreferrer">GitHub
+                Repo</a>
         </p>
     </footer>
 
     <script type="module" src="./app.js"></script>
 </body>
+
 </html>

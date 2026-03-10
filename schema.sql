@@ -1,16 +1,18 @@
 -- [EN] Create profiles table for user settings and statistics
 -- [ES] Crear tabla de perfiles para configuraciones y estadísticas del usuario
 CREATE TABLE public.profiles (
-  id uuid NOT NULL REFERENCES auth.users ON DELETE CASCADE,
-  telegram_token text,
-  telegram_chat_id text,
-  detect_cars boolean DEFAULT true,
-  detect_persons boolean DEFAULT true,
-  interest_zone jsonb,
-  total_alerts integer DEFAULT 0,
-  trip_alerts integer DEFAULT 0,
-  total_usage_minutes integer DEFAULT 0,
-  trip_usage_minutes integer DEFAULT 0,
+  id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  telegram_token TEXT,
+  telegram_chat_id TEXT,
+  interest_zone JSONB,
+  detect_cars BOOLEAN DEFAULT true,
+  detect_persons BOOLEAN DEFAULT true,
+  enable_animations BOOLEAN DEFAULT true,
+  total_usage_minutes INT DEFAULT 0,
+  total_alerts INT DEFAULT 0,
+  trip_usage_minutes INT DEFAULT 0,
+  trip_alerts INT DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
   PRIMARY KEY (id)
 );
 
