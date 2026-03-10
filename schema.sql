@@ -4,7 +4,7 @@
 
 -- [EN] Create profiles table for user settings and statistics
 -- [ES] Crear tabla de perfiles para configuraciones y estadísticas del usuario
-CREATE TABLE public.profiles (
+CREATE TABLE IF NOT EXISTS public.profiles (
   id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
   telegram_token TEXT,
   telegram_chat_id TEXT,
@@ -24,16 +24,23 @@ CREATE TABLE public.profiles (
 -- [ES] Habilitar Seguridad a Nivel de Fila (RLS) para privacidad de perfiles
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view own profile" ON public.profiles;
 CREATE POLICY "Users can view own profile" ON public.profiles FOR SELECT USING (auth.uid() = id);
+
+DROP POLICY IF EXISTS "Users can insert own profile" ON public.profiles;
 CREATE POLICY "Users can insert own profile" ON public.profiles FOR INSERT WITH CHECK (auth.uid() = id);
+
+DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
 CREATE POLICY "Users can update own profile" ON public.profiles FOR UPDATE USING (auth.uid() = id);
+
+DROP POLICY IF EXISTS "Users can delete own profile" ON public.profiles;
 CREATE POLICY "Users can delete own profile" ON public.profiles FOR DELETE USING (auth.uid() = id);
 
 -- [EN] Create alerts table to log detected events
 -- [ES] Crear tabla de alertas para registrar eventos detectados
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
-CREATE TABLE public.alerts (
+CREATE TABLE IF NOT EXISTS public.alerts (
   id uuid NOT NULL DEFAULT uuid_generate_v4(),
   user_id uuid REFERENCES public.profiles(id) ON DELETE CASCADE,
   created_at timestamptz DEFAULT now(),
@@ -47,14 +54,31 @@ CREATE TABLE public.alerts (
 -- [ES] Habilitar RLS para alertas para prevenir acceso no autorizado
 ALTER TABLE public.alerts ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view own alerts" ON public.alerts;
 CREATE POLICY "Users can view own alerts" ON public.alerts FOR SELECT USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can insert own alerts" ON public.alerts;
 CREATE POLICY "Users can insert own alerts" ON public.alerts FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can update own alerts" ON public.alerts;
 CREATE POLICY "Users can update own alerts" ON public.alerts FOR UPDATE USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can delete own alerts" ON public.alerts;
 CREATE POLICY "Users can delete own alerts" ON public.alerts FOR DELETE USING (auth.uid() = user_id);
 
 -- [EN] Enable Supabase Realtime for the alerts table (Required for Dashboard updates)
 -- [ES] Habilitar Supabase Realtime para la tabla de alertas (Requerido para actualizaciones del Dashboard)
-ALTER PUBLICATION supabase_realtime ADD TABLE public.alerts;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime' AND tablename = 'alerts'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.alerts;
+  END IF;
+END
+$$;
 
 -- [EN] Setup pg_cron for automatic deletion of alerts older than 7 days
 -- [ES] Configurar pg_cron para la eliminación automática de alertas con más de 7 días
@@ -73,14 +97,17 @@ INSERT INTO storage.buckets (id, name, public)
 VALUES ('alerts-photos', 'alerts-photos', true)
 ON CONFLICT (id) DO NOTHING;
 
+DROP POLICY IF EXISTS "Public Read Access for Photos" ON storage.objects;
 CREATE POLICY "Public Read Access for Photos"
 ON storage.objects FOR SELECT
 USING ( bucket_id = 'alerts-photos' );
 
+DROP POLICY IF EXISTS "Authenticated Users can Insert Photos" ON storage.objects;
 CREATE POLICY "Authenticated Users can Insert Photos"
 ON storage.objects FOR INSERT
 WITH CHECK ( bucket_id = 'alerts-photos' AND auth.role() = 'authenticated' );
 
+DROP POLICY IF EXISTS "Authenticated Users can Delete Photos" ON storage.objects;
 CREATE POLICY "Authenticated Users can Delete Photos"
 ON storage.objects FOR DELETE
 USING ( bucket_id = 'alerts-photos' AND auth.role() = 'authenticated' );
