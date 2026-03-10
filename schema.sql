@@ -1,3 +1,7 @@
+-- [EN] CLEAN UP EXISTING EXPERIMENTAL TABLES / [ES] LIMPIAR TABLAS EXPERIMENTALES EXISTENTES
+DROP TABLE IF EXISTS public.alerts CASCADE;
+DROP TABLE IF EXISTS public.profiles CASCADE;
+
 -- [EN] Create profiles table for user settings and statistics
 -- [ES] Crear tabla de perfiles para configuraciones y estadísticas del usuario
 CREATE TABLE public.profiles (
