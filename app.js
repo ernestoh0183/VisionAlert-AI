@@ -30,8 +30,9 @@ window.app = {
             // [ES] Cerrar sesión via Supabase. El evento SIGNED_OUT en `onAuthStateChange` manejará la recarga.
             try { await supabase.auth.signOut(); } catch (e) { console.warn(e); }
             localStorage.removeItem('visionAlertLastView');
-            // [EN] Do NOT call window.location.replace here - let the onAuthStateChange handler do the reload.
-            // [ES] NO llamar window.location.replace acá - dejar que el manejador de onAuthStateChange recargue.
+            // [EN] Fallback: If SIGNED_OUT event fails to fire (e.g. stale token), force reload anyway after 1s
+            // [ES] Respaldo: Si el evento SIGNED_OUT falla al dispararse (ej. token caducado), forzar recarga tras 1s
+            setTimeout(() => window.location.replace(window.location.origin), 1000);
         }
     }
 };
@@ -94,38 +95,48 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Canvas Listeners
     const canvas = document.getElementById('camera-canvas');
-    canvas.addEventListener('mousedown', startDraw);
-    canvas.addEventListener('mousemove', doDraw);
-    canvas.addEventListener('mouseup', endDraw);
-    canvas.addEventListener('touchstart', (e) => { e.preventDefault(); startDraw(e.touches[0]); }, { passive: false });
-    canvas.addEventListener('touchmove', (e) => { e.preventDefault(); doDraw(e.touches[0]); }, { passive: false });
-    canvas.addEventListener('touchend', endDraw);
-});
+    if (canvas) {
+        canvas.addEventListener('mousedown', startDraw);
+        canvas.addEventListener('mousemove', doDraw);
+        canvas.addEventListener('mouseup', endDraw);
+        canvas.addEventListener('touchstart', (e) => { e.preventDefault(); startDraw(e.touches[0]); }, { passive: false });
+        canvas.addEventListener('touchmove', (e) => { e.preventDefault(); doDraw(e.touches[0]); }, { passive: false });
+        canvas.addEventListener('touchend', endDraw);
+    }
 
-// [EN] AUTH FLOW & SESSION / [ES] FLUJO DE AUTENTICACIÓN Y SESIÓN
-supabase.auth.onAuthStateChange(async (event, session) => {
-    if (session) {
-        if (!state.user) {
-            state.user = session.user;
-            document.getElementById('main-nav').classList.remove('hidden');
-            await loadProfile();
-            const lastView = localStorage.getItem('visionAlertLastView') || 'dashboard';
-            navigate(lastView === 'auth' ? 'dashboard' : lastView);
-            initRealtime();
-        }
-    } else {
-        state.user = null;
-        state.profile = null;
-        // [EN] Force a hard reload on sign out to cleanly kill camera, TFJS model, and WebSockets
-        // [ES] Forzar recarga al cerrar sesión para limpiar la cámara, el modelo TFJS y los WebSockets
-        if (event === 'SIGNED_OUT') {
-            window.location.reload();
+    // [EN] Proactively Fetch Session on Load (F5 Fix) / [ES] Obtener Sesión Proactivamente al Cargar (Arreglo F5)
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+        if (error) console.error("Session fetch error:", error);
+        if (session) {
+            handleSession(session);
         } else {
-            document.getElementById('main-nav').classList.add('hidden');
+            document.getElementById('main-nav')?.classList.add('hidden');
             navigate('auth');
         }
-    }
+    });
+
+    // [EN] Listen for future auth state changes / [ES] Escuchar futuros cambios de estado de auth
+    supabase.auth.onAuthStateChange(async (event, session) => {
+        if (event === 'SIGNED_OUT') {
+            state.user = null;
+            state.profile = null;
+            window.location.replace(window.location.origin);
+        } else if (session && !state.user) {
+            handleSession(session);
+        }
+    });
 });
+
+// [EN] Session Bootstrapper / [ES] Inicializador de Sesión
+async function handleSession(session) {
+    if (state.user) return; // Prevent double-execution
+    state.user = session.user;
+    document.getElementById('main-nav')?.classList.remove('hidden');
+    await loadProfile();
+    const lastView = localStorage.getItem('visionAlertLastView') || 'dashboard';
+    navigate(lastView === 'auth' ? 'dashboard' : lastView);
+    initRealtime();
+}
 
 async function handleLogin(e) {
     e.preventDefault();
