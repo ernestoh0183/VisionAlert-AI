@@ -89,7 +89,9 @@ window.app = {
             // [ES] DEBE esperar signOut para que el token se borre de localStorage ANTES de recargar.
             // [ES] Sin await: página recarga -> getSession() encuentra viejo token -> re-autentica!
             try { await supabase.auth.signOut(); } catch (e) { console.warn('signOut error:', e); }
-            window.location.replace(window.location.origin);
+            // [EN] Redirect to the current path to re-initialize the app (important for subdirectories)
+            // [ES] Redirigir a la ruta actual para re-inicializar la app (importante para subcarpetas)
+            window.location.replace(window.location.pathname);
         }
     }
 };
