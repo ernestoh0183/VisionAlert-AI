@@ -60,3 +60,21 @@ SELECT cron.schedule(
   '0 0 * * *',
   $$DELETE FROM public.alerts WHERE created_at < NOW() - INTERVAL '7 days';$$
 );
+
+-- [EN] Create 'alerts-photos' storage bucket and set permissions
+-- [ES] Crear bucket de almacenamiento 'alerts-photos' y establecer permisos
+INSERT INTO storage.buckets (id, name, public) 
+VALUES ('alerts-photos', 'alerts-photos', true)
+ON CONFLICT (id) DO NOTHING;
+
+CREATE POLICY "Public Read Access for Photos"
+ON storage.objects FOR SELECT
+USING ( bucket_id = 'alerts-photos' );
+
+CREATE POLICY "Authenticated Users can Insert Photos"
+ON storage.objects FOR INSERT
+WITH CHECK ( bucket_id = 'alerts-photos' AND auth.role() = 'authenticated' );
+
+CREATE POLICY "Authenticated Users can Delete Photos"
+ON storage.objects FOR DELETE
+USING ( bucket_id = 'alerts-photos' AND auth.role() = 'authenticated' );

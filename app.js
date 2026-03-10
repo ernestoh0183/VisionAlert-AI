@@ -19,13 +19,15 @@ const state = {
 // [EN] Global Exposure for navigation / [ES] Exposición Global para navegación
 window.app = {
     navigate,
+    openImageModal,
+    closeImageModal,
     auth: {
-        signOut: async () => { 
+        signOut: async () => {
             stopCamera();
             stopUsageTracking();
-            try { await supabase.auth.signOut(); } catch(e) { console.warn(e); }
+            try { await supabase.auth.signOut(); } catch (e) { console.warn(e); }
             localStorage.removeItem('visionAlertLastView');
-            window.location.replace(window.location.origin); 
+            window.location.replace(window.location.origin);
         }
     }
 };
@@ -57,7 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Button Binds
     document.getElementById('auth-form').addEventListener('submit', handleLogin);
     document.getElementById('btn-register').addEventListener('click', handleRegister);
-    
+
     // Reset Password Binds
     document.getElementById('btn-show-reset').addEventListener('click', () => {
         document.getElementById('auth-form').parentElement.classList.add('hidden');
@@ -144,7 +146,7 @@ async function handleResetPassword(e) {
     const email = document.getElementById('reset-email').value;
     const errEl = document.getElementById('reset-error');
     const msgEl = document.getElementById('reset-message');
-    
+
     errEl.textContent = '';
     msgEl.textContent = 'Sending...';
 
@@ -211,7 +213,7 @@ async function saveConfig(e) {
 // [EN] UI LOGIC & VIEWS SWITCHING / [ES] LÓGICA DE INTERFAZ Y CAMBIO DE VISTAS
 function navigate(viewId) {
     if (viewId !== 'auth') localStorage.setItem('visionAlertLastView', viewId);
-    
+
     document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
     document.getElementById(`view-${viewId}`).classList.remove('hidden');
 
@@ -227,6 +229,21 @@ function navigate(viewId) {
         loadAlerts();
         checkNotificationStatus();
     }
+}
+
+// [EN] MODAL LOGIC / [ES] LÓGICA DE MODAL
+function openImageModal(src) {
+    const modal = document.getElementById('image-modal');
+    const img = document.getElementById('modal-image');
+    if (!modal || !img) return;
+    img.src = src;
+    modal.classList.remove('hidden');
+}
+
+function closeImageModal(e) {
+    if (e && e.target.id === 'modal-image') return; // Don't close when clicking the actual image
+    const modal = document.getElementById('image-modal');
+    if (modal) modal.classList.add('hidden');
 }
 
 // [EN] ODOMETER & USAGE TRACKING / [ES] ODÓMETRO Y SEGUIMIENTO DE USO
@@ -268,14 +285,14 @@ function checkNotificationStatus() {
     const statusEl = document.getElementById('notification-status');
     const btnEl = document.getElementById('btn-request-notifications');
     if (!statusEl || !btnEl) return;
-    
+
     if (!('Notification' in window)) {
         statusEl.textContent = 'Status: Not Supported by Browser';
         statusEl.className = 'error-msg';
         btnEl.style.display = 'none';
         return;
     }
-    
+
     if (Notification.permission === 'granted') {
         statusEl.textContent = 'Status: Enabled ✅';
         statusEl.className = 'success-msg';
@@ -295,7 +312,7 @@ function checkNotificationStatus() {
 
 async function requestNotifications() {
     if (!('Notification' in window)) return;
-    
+
     const sendTestNotification = (title, message) => {
         if (navigator.serviceWorker) {
             navigator.serviceWorker.ready.then(reg => {
@@ -310,7 +327,7 @@ async function requestNotifications() {
         sendTestNotification('VisionAlert AI Test', 'Notifications are working correctly!');
         return;
     }
-    
+
     const permission = await Notification.requestPermission();
     checkNotificationStatus();
     if (permission === 'granted') {
@@ -344,7 +361,7 @@ function prependAlertCard(alert) {
         <h4>Alert: ${alert.type.toUpperCase()}</h4>
         <small>${date}</small>
         <p>Quantity: ${alert.quantity}</p>
-        ${alert.photo_url ? `<img src="${alert.photo_url}" alt="Alert photo" loading="lazy">` : ''}
+        ${alert.photo_url ? `<img src="${alert.photo_url}" alt="Alert photo" loading="lazy" class="alert-thumbnail" onclick="app.openImageModal(this.src)">` : ''}
     `;
     grid.prepend(div);
 }
@@ -524,7 +541,7 @@ async function inferenceLoop() {
             // [EN] Default to true if profile is somehow missing the property
             const detectPersons = state.profile?.detect_persons !== false;
             const detectCars = state.profile?.detect_cars !== false;
-            
+
             const isTarget = (p.class === 'person' && detectPersons) ||
                 (p.class === 'car' && detectCars);
             if (!isTarget) return;
@@ -590,7 +607,13 @@ function handleTrigger(persons, cars, video) {
 
         // A & B: Upload photo -> Then Insert to Alerts Database
         const uploadAndInsertPromise = supabase.storage.from('alerts-photos').upload(fileName, blob, { contentType: 'image/jpeg' })
-            .then(() => supabase.storage.from('alerts-photos').getPublicUrl(fileName).data.publicUrl)
+            .then(({ data, error }) => {
+                if (error) {
+                    console.error('Supabase Storage Error:', error);
+                    throw error;
+                }
+                return supabase.storage.from('alerts-photos').getPublicUrl(fileName).data.publicUrl;
+            })
             .then(publicUrl => supabase.from('alerts').insert({
                 user_id: state.user.id,
                 type: type,
@@ -694,7 +717,7 @@ function initAnimatedBackground() {
         } else if (type === 'pentagon') {
             el = document.createElementNS(svgNS, "polygon");
             const s = size * 1.2;
-            el.setAttribute("points", `${s / 2},1 ${s-1},${s * 0.38} ${s * 0.81},${s-1} ${s * 0.19},${s-1} 1,${s * 0.38}`);
+            el.setAttribute("points", `${s / 2},1 ${s - 1},${s * 0.38} ${s * 0.81},${s - 1} ${s * 0.19},${s - 1} 1,${s * 0.38}`);
             el.setAttribute("transform", `translate(${size * 0.4}, ${size * 0.4})`);
         }
 

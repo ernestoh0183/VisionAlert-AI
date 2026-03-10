@@ -1,4 +1,4 @@
-const CACHE_NAME = 'visionalert-cache-v9';
+const CACHE_NAME = 'visionalert-cache-v10';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -16,8 +16,8 @@ self.addEventListener('install', (event) => {
     caches.open(CACHE_NAME).then((cache) => {
       // [EN] Using Settled to prevent failure if icon files are missing initially
       // [ES] Usando Settled para evitar fallos si faltan los archivos de iconos al inicio
-      const promises = ASSETS_TO_CACHE.map(asset => 
-          cache.add(asset).catch(e => console.warn('Cache add failed for:', asset, e))
+      const promises = ASSETS_TO_CACHE.map(asset =>
+        cache.add(asset).catch(e => console.warn('Cache add failed for:', asset, e))
       );
       return Promise.allSettled(promises);
     })
