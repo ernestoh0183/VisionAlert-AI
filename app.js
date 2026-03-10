@@ -13,8 +13,7 @@ const state = {
     user: null, profile: null, model: null, cameraStream: null,
     isInferencing: false, lastTrigger: 0, cooldownMs: 30000,
     zone: null, videoDimensions: null, usageInterval: null,
-    drawing: false, drawStart: { x: 0, y: 0 }, alertsOffset: 0,
-    sessionReady: false // [EN] Gate for UI actions / [ES] Barrera para acciones de UI
+    drawing: false, drawStart: { x: 0, y: 0 }, alertsOffset: 0
 };
 
 // [EN] Global Exposure for navigation / [ES] Exposición Global para navegación
@@ -23,18 +22,20 @@ window.app = {
     openImageModal,
     closeImageModal,
     auth: {
-        signOut: async () => {
+        signOut: () => {
+            // [EN] SYNCHRONOUS cleanup — no awaiting anything that could hang.
+            // [ES] Limpieza SÍNCRONA — no esperar nada que pueda colgarse.
             stopCamera();
             stopUsageTracking();
-            await flushUsageTrackingToDB();
-            // [EN] Clear state immediately to prevent stale references / [ES] Limpiar estado para prevenir referencias obsoletas
+            // [EN] Fire-and-forget flush: don't await, just let it try in background
+            // [ES] Flush sin espera: no esperar, solo dejar que intente en segundo plano
+            flushUsageTrackingToDB().catch(() => { });
             state.user = null;
             state.profile = null;
-            state.sessionReady = false;
             localStorage.removeItem('visionAlertLastView');
-            try { await supabase.auth.signOut(); } catch (e) { console.warn(e); }
-            // [EN] Force hard reset. Don't wait for events — this guarantees a clean slate.
-            // [ES] Forzar reinicio duro. No esperar eventos — esto garantiza una pizarra limpia.
+            supabase.auth.signOut().catch(() => { });
+            // [EN] Immediate hard redirect — guaranteed to work, no dependencies.
+            // [ES] Redirección dura inmediata — garantizada, sin dependencias.
             window.location.replace(window.location.origin);
         }
     }
@@ -106,77 +107,66 @@ document.addEventListener('DOMContentLoaded', () => {
         canvas.addEventListener('touchmove', (e) => { e.preventDefault(); doDraw(e.touches[0]); }, { passive: false });
         canvas.addEventListener('touchend', endDraw);
     }
+
+    // =====================================================================
+    // [EN] SESSION INITIALIZATION — getSession() is the ONLY reliable method.
+    // [EN] onAuthStateChange fires events BEFORE the client's internal JWT is ready,
+    // [EN] which causes all subsequent API calls (.from(), .storage, etc.) to hang.
+    // [EN] getSession() WAITS for the JWT to be verified and returns the real state.
+    //
+    // [ES] INICIALIZACIÓN DE SESIÓN — getSession() es el ÚNICO método confiable.
+    // [ES] onAuthStateChange dispara eventos ANTES de que el JWT interno del cliente esté listo,
+    // [ES] lo que causa que todas las llamadas API posteriores (.from(), .storage, etc.) se cuelguen.
+    // [ES] getSession() ESPERA a que el JWT sea verificado y retorna el estado real.
+    // =====================================================================
+    initSession();
 });
 
-// =======================================================================
-// [EN] AUTH FLOW — SINGLE SOURCE OF TRUTH / [ES] FLUJO DE AUTH — FUENTE ÚINICA DE VERDAD
-//
-// [EN] CRITICAL: Supabase v2 fires INITIAL_SESSION with a null session BEFORE it finishes
-//      verifying the stored token from localStorage. The SIGNED_IN event fires ~1s later.
-//      So we MUST NOT navigate to 'auth' on a null INITIAL_SESSION. We wait for SIGNED_IN.
-// [ES] CRÍTICO: Supabase v2 dispara INITIAL_SESSION con sesión nula ANTES de terminar de
-//      verificar el token guardado en localStorage. El evento SIGNED_IN llega ~1s después.
-//      Por eso NO podemos navegar a 'auth' en un INITIAL_SESSION nulo. Esperamos SIGNED_IN.
-// =======================================================================
-supabase.auth.onAuthStateChange(async (event, session) => {
-    console.log('[Auth]', event, session ? 'session exists' : 'no session');
+// [EN] Primary session initializer / [ES] Inicializador primario de sesión
+async function initSession() {
+    try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        console.log('[Auth] getSession result:', session ? 'session found' : 'no session', error || '');
 
-    if (event === 'SIGNED_OUT') {
-        // [EN] This is the only reliable signal that the user truly has no session.
-        // [ES] Esta es la única señal confiable de que el usuario realmente no tiene sesión.
-        state.user = null;
-        state.profile = null;
-        state.sessionReady = false;
-        document.getElementById('main-nav')?.classList.add('hidden');
-        navigate('auth');
-        return;
-    }
-
-    // [EN] INITIAL_SESSION fires with null session while the token is being verified.
-    // [EN] We IGNORE this case and wait for SIGNED_IN to provide the real session.
-    // [ES] INITIAL_SESSION se dispara con sesión nula mientras se verifica el token.
-    // [ES] IGNORAMOS este caso y esperamos SIGNED_IN para obtener la sesión real.
-    if (!session) {
-        // [EN] Only navigate to auth if we already know the user is not logged in.
-        // [ES] Solo navegar a auth si ya sabemos que el usuario no está logueado.
-        if (event === 'INITIAL_SESSION') {
-            console.log('[Auth] Waiting for token verification...');
-        }
-        return;
-    }
-
-    // [EN] Session exists and user is not yet hydrated: bootstrap the app.
-    // [ES] La sesión existe y el usuario aún no está hidratado: inicializar la app.
-    if (!state.sessionReady) {
-        state.user = session.user;
-        state.sessionReady = true;
-        document.getElementById('main-nav')?.classList.remove('hidden');
-        try {
+        if (session) {
+            state.user = session.user;
+            document.getElementById('main-nav')?.classList.remove('hidden');
             await loadProfile();
-        } catch (e) {
-            console.error('[Auth] Failed to load profile:', e);
+            const lastView = localStorage.getItem('visionAlertLastView') || 'dashboard';
+            navigate(lastView === 'auth' ? 'dashboard' : lastView);
+            initRealtime();
+        } else {
+            document.getElementById('main-nav')?.classList.add('hidden');
+            navigate('auth');
         }
-        const lastView = localStorage.getItem('visionAlertLastView') || 'dashboard';
-        navigate(lastView === 'auth' ? 'dashboard' : lastView);
-        initRealtime();
-    }
-
-    // [EN] INITIAL_SESSION with a valid session: user was logged in and page was reloaded.
-    // [ES] INITIAL_SESSION con sesión válida: el usuario estaba logueado y recargó la página.
-    if (event === 'INITIAL_SESSION' && session && state.sessionReady) {
-        console.log('[Auth] Session already hydrated, skipping re-init.');
-    }
-});
-
-// [EN] FALLBACK: If no auth event arrives after 3s, show login screen.
-// [ES] RESPALDO: Si no llega ningún evento de auth en 3s, mostrar pantalla de login.
-setTimeout(() => {
-    if (!state.sessionReady) {
-        console.log('[Auth] Timeout: No session received. Redirecting to auth.');
-        document.getElementById('main-nav')?.classList.add('hidden');
+    } catch (e) {
+        console.error('[Auth] initSession failed:', e);
         navigate('auth');
     }
-}, 3000);
+
+    // [EN] Listen for FUTURE changes only (login, logout, token refresh)
+    // [ES] Escuchar SOLO cambios futuros (login, logout, refrescar token)
+    supabase.auth.onAuthStateChange(async (event, session) => {
+        console.log('[Auth] onAuthStateChange:', event);
+
+        if (event === 'SIGNED_IN' && !state.user) {
+            // [EN] Fresh login (not a page reload — that's handled by getSession above)
+            // [ES] Login fresco (no recarga de página — eso lo maneja getSession arriba)
+            state.user = session.user;
+            document.getElementById('main-nav')?.classList.remove('hidden');
+            await loadProfile();
+            navigate('dashboard');
+            initRealtime();
+        }
+
+        if (event === 'SIGNED_OUT') {
+            state.user = null;
+            state.profile = null;
+            document.getElementById('main-nav')?.classList.add('hidden');
+            navigate('auth');
+        }
+    });
+}
 
 async function handleLogin(e) {
     e.preventDefault();
@@ -230,6 +220,7 @@ async function handleResetPassword(e) {
 }
 
 async function loadProfile() {
+    if (!state.user) return;
     let { data, error } = await supabase.from('profiles').select('*').eq('id', state.user.id).single();
     if (error || !data) {
         const { data: newData, error: iErr } = await supabase.from('profiles').insert({ id: state.user.id }).select().single();
@@ -289,24 +280,23 @@ async function saveAnimations() {
 
     const enableAnim = animCheckbox.checked;
 
-    // [EN] If user is authenticated, persist to DB. Otherwise, just apply locally.
-    // [ES] Si el usuario está autenticado, persistir en BD. Si no, aplicar solo localmente.
+    // [EN] Save to localStorage always (works even without auth) / [ES] Guardar en localStorage siempre
+    localStorage.setItem('visionAlertAnimations', enableAnim ? 'true' : 'false');
+
+    // [EN] If user is authenticated, also persist to DB / [ES] Si el usuario está autenticado, también persistir en BD
     if (state.user?.id) {
         status.textContent = 'Saving...';
         const { error } = await supabase.from('profiles').update({ enable_animations: enableAnim }).eq('id', state.user.id);
         if (error) {
             status.textContent = 'Error: ' + error.message;
             status.className = 'error-msg';
-            return;
+        } else {
+            if (state.profile) state.profile.enable_animations = enableAnim;
+            status.textContent = 'Display settings saved!';
+            status.className = 'success-msg';
+            setTimeout(() => status.textContent = '', 3000);
         }
-        if (state.profile) state.profile.enable_animations = enableAnim;
-        status.textContent = 'Display settings saved!';
-        status.className = 'success-msg';
-        setTimeout(() => status.textContent = '', 3000);
     }
-
-    // [EN] Also save to localStorage as a fast-access fallback / [ES] También guardar en localStorage como respaldo rápido
-    localStorage.setItem('visionAlertAnimations', enableAnim ? 'true' : 'false');
 
     // [EN] Apply animation change immediately / [ES] Aplicar el cambio de animación inmediatamente
     if (enableAnim) {
@@ -330,11 +320,11 @@ function navigate(viewId) {
     } else {
         stopCamera();
         stopUsageTracking();
-        flushUsageTrackingToDB();
+        flushUsageTrackingToDB().catch(() => { });
     }
 
     if (viewId === 'dashboard') {
-        state.alertsOffset = 0; // Reset offset when entering dashboard
+        state.alertsOffset = 0;
         loadAlerts();
         checkNotificationStatus();
     }
@@ -350,7 +340,7 @@ function openImageModal(src) {
 }
 
 function closeImageModal(e) {
-    if (e && e.target.id === 'modal-image') return; // Don't close when clicking the actual image
+    if (e && e.target.id === 'modal-image') return;
     const modal = document.getElementById('image-modal');
     if (modal) modal.classList.add('hidden');
 }
@@ -364,7 +354,7 @@ function updateOdometerUI() {
 }
 
 async function resetTrip() {
-    if (!state.profile) return;
+    if (!state.profile || !state.user) return;
     state.profile.trip_usage_minutes = 0;
     state.profile.trip_alerts = 0;
     updateOdometerUI();
@@ -378,8 +368,7 @@ function startUsageTracking() {
         state.profile.total_usage_minutes++;
         state.profile.trip_usage_minutes++;
         updateOdometerUI();
-        // Memory buffered. Will flush to DB implicitly when camera stops or user logs out.
-    }, 60000); // 1 minute
+    }, 60000);
 }
 
 function stopUsageTracking() {
@@ -470,37 +459,42 @@ async function loadAlerts(isAppend = false) {
         if (loadBtn) loadBtn.disabled = true;
     }
 
-    const { data, error } = await supabase.from('alerts').select('*')
-        .order('created_at', { ascending: false })
-        .range(state.alertsOffset, state.alertsOffset + 19);
+    try {
+        const { data, error } = await supabase.from('alerts').select('*')
+            .order('created_at', { ascending: false })
+            .range(state.alertsOffset, state.alertsOffset + 19);
 
-    if (document.getElementById('loading-row')) document.getElementById('loading-row').remove();
-    if (!isAppend) tbody.innerHTML = '';
+        if (document.getElementById('loading-row')) document.getElementById('loading-row').remove();
+        if (!isAppend) tbody.innerHTML = '';
 
-    if (loadBtn) {
-        loadBtn.disabled = false;
-        loadBtn.style.display = (data && data.length === 20) ? 'block' : 'none';
-        if (data && data.length < 20 && isAppend) {
-            loadBtn.style.display = 'block';
-            loadBtn.textContent = 'No more alerts';
-            loadBtn.disabled = true;
-        } else if (loadBtn.textContent === 'No more alerts') {
-            loadBtn.textContent = 'Load More Alerts'; // Reset
+        if (loadBtn) {
+            loadBtn.disabled = false;
+            loadBtn.style.display = (data && data.length === 20) ? 'block' : 'none';
+            if (data && data.length < 20 && isAppend) {
+                loadBtn.style.display = 'block';
+                loadBtn.textContent = 'No more alerts';
+                loadBtn.disabled = true;
+            } else if (loadBtn.textContent === 'No more alerts') {
+                loadBtn.textContent = 'Load More Alerts';
+            }
         }
-    }
 
-    if (error || !data || (data.length === 0 && !isAppend)) {
-        if (!isAppend) tbody.innerHTML = '<tr><td colspan="4" style="text-align: center;">No alerts yet.</td></tr>';
-        return;
-    }
+        if (error || !data || (data.length === 0 && !isAppend)) {
+            if (!isAppend) tbody.innerHTML = '<tr><td colspan="4" style="text-align: center;">No alerts yet.</td></tr>';
+            if (error) console.error('Alerts fetch error:', error);
+            return;
+        }
 
-    // Append older alerts to the bottom
-    data.forEach(alert => appendAlertRow(alert, isAppend));
+        data.forEach(alert => appendAlertRow(alert));
+    } catch (e) {
+        console.error('loadAlerts exception:', e);
+        if (!isAppend) tbody.innerHTML = '<tr><td colspan="4" style="text-align: center;">Error loading alerts.</td></tr>';
+    }
 }
 
-function appendAlertRow(alert, isAppend = false) {
+function appendAlertRow(alert) {
     const tbody = document.getElementById('alerts-tbody');
-    if (tbody.innerHTML.includes('No alerts yet')) tbody.innerHTML = '';
+    if (tbody.innerHTML.includes('No alerts yet') || tbody.innerHTML.includes('Loading alerts')) tbody.innerHTML = '';
 
     const tr = document.createElement('tr');
     tr.dataset.id = alert.id;
@@ -521,7 +515,8 @@ function appendAlertRow(alert, isAppend = false) {
 // Separate function specifically for Realtime inserts (which always go to the top)
 function prependAlertRow(alert) {
     const tbody = document.getElementById('alerts-tbody');
-    if (tbody.innerHTML.includes('No alerts yet')) tbody.innerHTML = '';
+    if (!tbody) return;
+    if (tbody.innerHTML.includes('No alerts yet') || tbody.innerHTML.includes('Loading alerts')) tbody.innerHTML = '';
     const tr = document.createElement('tr');
     tr.dataset.id = alert.id;
     tr.innerHTML = `<td>${new Date(alert.created_at).toLocaleString()}</td><td><strong>${alert.type.toUpperCase()}</strong></td><td>${alert.quantity}</td><td>${alert.photo_url ? `<img src="${alert.photo_url}" class="alert-thumbnail" onclick="app.openImageModal(this.src)">` : '<span style="opacity: 0.5;">No Image</span>'}</td>`;
@@ -545,7 +540,7 @@ async function clearHistory() {
                 const el = document.querySelector(`tr[data-id="${deletedAlert.id}"]`);
                 if (el) {
                     el.classList.add('fade-out');
-                    setTimeout(() => el.remove(), 500); // Wait for transition
+                    setTimeout(() => el.remove(), 500);
                 }
             });
         }
@@ -559,9 +554,9 @@ function initRealtime() {
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'alerts', filter: `user_id=eq.${state.user.id}` }, payload => {
             try {
                 const audio = new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg');
-                audio.play().catch(e => console.warn('Audio playback prevented by browser auto-play policy:', e));
+                audio.play().catch(e => console.warn('Audio playback prevented:', e));
             } catch (err) {
-                console.error('Error attempting to play audio:', err);
+                console.error('Audio error:', err);
             }
 
             if ('Notification' in window && Notification.permission === 'granted') {
@@ -589,7 +584,6 @@ async function startCamera() {
     }
 
     try {
-        // Rear camera preferred
         state.cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
         video.srcObject = state.cameraStream;
 
@@ -650,10 +644,10 @@ async function endDraw(e) {
     if (!state.drawing) return;
     state.drawing = false;
     if (state.zone.w > 20 && state.zone.h > 20) {
-        state.profile.interest_zone = state.zone;
-        await supabase.from('profiles').update({ interest_zone: state.zone }).eq('id', state.user.id);
+        if (state.profile) state.profile.interest_zone = state.zone;
+        if (state.user) await supabase.from('profiles').update({ interest_zone: state.zone }).eq('id', state.user.id);
     } else {
-        state.zone = state.profile.interest_zone; // cancel negligible draw
+        state.zone = state.profile?.interest_zone || null;
     }
 }
 
@@ -689,7 +683,7 @@ async function inferenceLoop() {
     if (video.readyState === 4 && state.model) {
         const predictions = await state.model.detect(video);
         const ctx = canvas.getContext('2d');
-        ctx.clearRect(0, 0, canvas.width, canvas.height); // clear entire canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         drawZone();
 
@@ -704,7 +698,6 @@ async function inferenceLoop() {
         let cCount = 0;
 
         predictions.forEach(p => {
-            // [EN] Default to true if profile is somehow missing the property
             const detectPersons = state.profile?.detect_persons !== false;
             const detectCars = state.profile?.detect_cars !== false;
 
@@ -714,14 +707,12 @@ async function inferenceLoop() {
 
             const [x, y, w, h] = p.bbox;
 
-            // Check intersection with interest zone
             if (state.zone) {
                 const z = state.zone;
                 const intersects = x < z.x + z.w && x + w > z.x && y < z.y + z.h && y + h > z.y;
                 if (!intersects) return;
             }
 
-            // Draw detected box
             ctx.strokeStyle = '#FF0000';
             ctx.lineWidth = 2;
             ctx.strokeRect(x, y, w, h);
@@ -742,7 +733,7 @@ async function inferenceLoop() {
     requestAnimationFrame(inferenceLoop);
 }
 
-// [EN] INCIDENT REPORTING (Parallel Execution via Promise.all) / [ES] REPORTE DE INCIDENTES (Ejecución Paralela vía Promise.all)
+// [EN] INCIDENT REPORTING / [ES] REPORTE DE INCIDENTES
 function handleTrigger(persons, cars, video) {
     const now = Date.now();
     if (now - state.lastTrigger < state.cooldownMs) return;
@@ -752,7 +743,6 @@ function handleTrigger(persons, cars, video) {
     document.body.classList.add('alarm-flash');
     setTimeout(() => document.body.classList.remove('alarm-flash'), 2000);
 
-    // [EN] Image Optimization for Supabase (Max 800px width) / [ES] Optimización de Imagen para Supabase (Máximo 800px de ancho)
     const MAX_WIDTH = 800;
     let width = video.videoWidth;
     let height = video.videoHeight;
@@ -763,7 +753,6 @@ function handleTrigger(persons, cars, video) {
         height = height * ratio;
     }
 
-    // Capture off-screen and resize
     const captureCanvas = document.createElement('canvas');
     captureCanvas.width = width;
     captureCanvas.height = height;
@@ -775,50 +764,39 @@ function handleTrigger(persons, cars, video) {
         const msg = `Alert! VisionAlert detected: ${persons} person(s), ${cars} car(s).`;
         const fileName = `alert_${state.user.id}_${now}.jpg`;
 
-        // A & B: Upload photo -> Then Insert to Alerts Database
         const uploadAndInsertPromise = supabase.storage.from('alerts-photos').upload(fileName, blob, { contentType: 'image/jpeg' })
             .then(({ data, error }) => {
-                if (error) {
-                    console.error('Supabase Storage Error:', error);
-                    throw error;
-                }
+                if (error) { console.error('Storage Error:', error); throw error; }
                 return supabase.storage.from('alerts-photos').getPublicUrl(fileName).data.publicUrl;
             })
             .then(publicUrl => supabase.from('alerts').insert({
-                user_id: state.user.id,
-                type: type,
-                quantity: quantity,
-                photo_url: publicUrl
+                user_id: state.user.id, type, quantity, photo_url: publicUrl
             }));
 
-        // C: Prepare Telegram Send (Edge Function primarily, direct fetch as fallback)
         let telegramPromise = Promise.resolve();
-        if (state.profile.telegram_token && state.profile.telegram_chat_id) {
+        if (state.profile?.telegram_token && state.profile?.telegram_chat_id) {
             const fd = new FormData();
             fd.append('chat_id', state.profile.telegram_chat_id);
             fd.append('token', state.profile.telegram_token);
             fd.append('caption', msg);
             fd.append('photo', blob, fileName);
 
-            telegramPromise = supabase.functions.invoke('telegram-webhook', {
-                body: fd,
-            }).then(({ data, error }) => {
-                if (error || !data?.success) throw new Error('Edge Function failed or not deployed.');
-                return data;
-            }).catch(e => {
-                console.warn('Fallback to direct Telegram API due to Edge Function error:', e.message);
-                const fallbackFd = new FormData();
-                fallbackFd.append('chat_id', state.profile.telegram_chat_id);
-                fallbackFd.append('photo', blob, fileName);
-                fallbackFd.append('caption', msg);
-                return fetch(`https://api.telegram.org/bot${state.profile.telegram_token}/sendPhoto`, {
-                    method: 'POST',
-                    body: fallbackFd
-                });
-            }).catch(err => console.error('Total Telegram failure:', err));
+            telegramPromise = supabase.functions.invoke('telegram-webhook', { body: fd })
+                .then(({ data, error }) => {
+                    if (error || !data?.success) throw new Error('Edge Function failed.');
+                    return data;
+                }).catch(e => {
+                    console.warn('Fallback to direct Telegram API:', e.message);
+                    const fallbackFd = new FormData();
+                    fallbackFd.append('chat_id', state.profile.telegram_chat_id);
+                    fallbackFd.append('photo', blob, fileName);
+                    fallbackFd.append('caption', msg);
+                    return fetch(`https://api.telegram.org/bot${state.profile.telegram_token}/sendPhoto`, {
+                        method: 'POST', body: fallbackFd
+                    });
+                }).catch(err => console.error('Total Telegram failure:', err));
         }
 
-        // D: Update Odometer Database
         state.profile.total_alerts += 1;
         state.profile.trip_alerts += 1;
         updateOdometerUI();
@@ -827,24 +805,16 @@ function handleTrigger(persons, cars, video) {
             trip_alerts: state.profile.trip_alerts
         }).eq('id', state.user.id);
 
-        // E: Browser Notification via Service Worker (More reliable for PWAs)
         if ('Notification' in window && Notification.permission === 'granted') {
             if (navigator.serviceWorker) {
                 navigator.serviceWorker.ready.then(reg => {
-                    reg.showNotification('VisionAlert Detection', {
-                        body: msg,
-                        icon: './logo192.png'
-                    });
+                    reg.showNotification('VisionAlert Detection', { body: msg, icon: './logo192.png' });
                 });
             } else {
-                new Notification('VisionAlert Detection', {
-                    body: msg,
-                    icon: './logo192.png'
-                });
+                new Notification('VisionAlert Detection', { body: msg, icon: './logo192.png' });
             }
         }
 
-        // Execute all promises simultaneously
         Promise.all([uploadAndInsertPromise, telegramPromise, updateODPromise])
             .catch(e => console.error('Trigger execution error:', e));
 
@@ -852,45 +822,39 @@ function handleTrigger(persons, cars, video) {
 }
 
 // [EN] ANIMATED BACKGROUND / [ES] FONDO ANIMADO
-// [EN] Dynamically generates SVG shapes for a lightweight, textured animated background without heavy performance hits.
-// [ES] Genera dinámicamente formas SVG para un fondo animado texturizado y ligero sin grandes impactos en el rendimiento.
 function initAnimatedBackground() {
     const bgContainer = document.getElementById('animated-bg');
     if (!bgContainer) return;
 
-    // Clear previous shapes if any
     bgContainer.innerHTML = '';
 
-    // [EN] Check localStorage first (fast), then profile setting / [ES] Verificar localStorage primero (rápido), luego la preferencia del perfil
     const localPref = localStorage.getItem('visionAlertAnimations');
     if (localPref === 'false') return;
     if (state.profile && state.profile.enable_animations === false) return;
 
     const shapes = ['line', 'square', 'rect', 'triangle', 'pentagon'];
-    const colors = ['#00e5ff', '#00e676']; // [EN] Cyan and Green / [ES] Cian y Verde
-    const numShapes = 40; // [EN] Dense enough for texture / [ES] Suficiente densidad para dar textura
+    const colors = ['#00e5ff', '#00e676'];
+    const numShapes = 40;
     const svgNS = "http://www.w3.org/2000/svg";
 
     for (let i = 0; i < numShapes; i++) {
-        // [EN] Randomize shape properties / [ES] Aleatorizar propiedades de forma
         const type = shapes[Math.floor(Math.random() * shapes.length)];
         const color = colors[Math.floor(Math.random() * colors.length)];
-        const size = Math.random() * 8 + 6; // 6px to 14px (small texture)
-        const duration = Math.random() * 40 + 30; // 30s to 70s
-        const delay = Math.random() * -70; // [EN] Start at random progress / [ES] Iniciar en progreso aleatorio
-        const leftPos = Math.random() * 100; // 0vw to 100vw
+        const size = Math.random() * 8 + 6;
+        const duration = Math.random() * 40 + 30;
+        const delay = Math.random() * -70;
+        const leftPos = Math.random() * 100;
 
         const rootSvg = document.createElementNS(svgNS, "svg");
         rootSvg.setAttribute("class", "floating-shape");
         rootSvg.setAttribute("width", size * 2);
         rootSvg.setAttribute("height", size * 2);
-        rootSvg.setAttribute("viewBox", `0 0 ${size * 2} ${size * 2}`); // [EN] Critical for relative scaling / [ES] Crítico para escalado relativo
+        rootSvg.setAttribute("viewBox", `0 0 ${size * 2} ${size * 2}`);
         rootSvg.style.left = `${leftPos}vw`;
         rootSvg.style.animationDuration = `${duration}s`;
         rootSvg.style.animationDelay = `${delay}s`;
 
         let el;
-        // [EN] Generate geometric paths based on type / [ES] Generar rutas geométricas según el tipo
         if (type === 'line') {
             el = document.createElementNS(svgNS, "line");
             el.setAttribute("x1", "1"); el.setAttribute("y1", "1");
@@ -913,7 +877,6 @@ function initAnimatedBackground() {
             el.setAttribute("transform", `translate(${size * 0.4}, ${size * 0.4})`);
         }
 
-        // [EN] Apply explicit stroke for visibility / [ES] Aplicar trazo explícito para visibilidad
         el.setAttribute("stroke", color);
         el.setAttribute("stroke-width", "2");
         el.setAttribute("fill", "none");
